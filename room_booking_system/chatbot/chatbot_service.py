@@ -1,7 +1,9 @@
 import requests
 from flask import jsonify
 from django.http import JsonResponse
-from .models import Rooms, Bookings, Users  # Import models if using Django ORM
+from rooms.models import Room
+from bookings.models import Booking
+from users.models import CustomUser
 
 # Wit.ai Token
 WIT_AI_TOKEN = "VMSEAGIHOYNO3UPF6RIL7CJ2OVJRKUP6"
