@@ -1,7 +1,7 @@
 import requests
 from flask import jsonify
 from django.http import JsonResponse
-from rooms.models import Room
+from rooms.models import Room  # Corrected import for the Room model
 from bookings.models import Booking
 from users.models import CustomUser
 
@@ -27,14 +27,14 @@ def get_chatbot_response(user_input):
             return JsonResponse({"response": "Hello! How can I assist you today?"})
 
         elif intent == "book_room":
-            rooms = Rooms.objects.filter(is_available=True)
+            rooms = Room.objects.filter(is_available=True)  # Corrected to Room
             if rooms.exists():
                 return JsonResponse({"response": "Rooms are available for booking. Please visit the booking section."})
             else:
                 return JsonResponse({"response": "Currently, no rooms are available for booking."})
 
         elif intent == "check_availability":
-            available_rooms = Rooms.objects.filter(is_available=True)
+            available_rooms = Room.objects.filter(is_available=True)  # Corrected to Room
             return JsonResponse({"response": f"There are {available_rooms.count()} rooms available right now."})
 
         elif intent == "cancel_booking":
@@ -45,4 +45,3 @@ def get_chatbot_response(user_input):
 
     except Exception as e:
         return JsonResponse({"response": f"Error: {str(e)}"})
-
