@@ -1,5 +1,6 @@
 from django.db import models
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from rooms.models import Room
 
 class Booking(models.Model):
@@ -15,8 +16,13 @@ class Booking(models.Model):
     end_time = models.DateTimeField()
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='pending')
     is_approved = models.BooleanField(default=False)
+    penalty_flag = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
         return f"Booking: {self.room.name} by {self.user.username} ({self.status})"
+
+    def clean(self):
+        if self.start_time >= self.end_time:
+            raise ValidationError("Start time must be before end time.")

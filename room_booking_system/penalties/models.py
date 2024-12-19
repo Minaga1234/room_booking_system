@@ -18,3 +18,8 @@ class Penalty(models.Model):
 
     def __str__(self):
         return f"Penalty for {self.user.username}: {self.amount} - {self.status}"
+
+    @staticmethod
+    def get_unpaid_penalties(user):
+        """Calculate total unpaid penalties for a user."""
+        return Penalty.objects.filter(user=user, status='unpaid').aggregate(total=models.Sum('amount'))['total'] or 0.00

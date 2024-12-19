@@ -5,7 +5,6 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.generics import RetrieveUpdateAPIView
 from .serializers import UserSerializer
 from .models import CustomUser
-from .serializers import UserSerializer
 
 class RegisterView(APIView):
     def post(self, request):
