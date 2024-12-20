@@ -1,30 +1,14 @@
-#rooms/models.py
 from django.db import models
-from django.conf import settings
-from django.utils import timezone
 
 class Room(models.Model):
-    name = models.CharField(max_length=100, unique=True)  # Unique room name
-    location = models.CharField(max_length=100)  # Location details
-    capacity = models.IntegerField()  # Maximum capacity of the room
-    is_available = models.BooleanField(default=True)  # Room availability
-    requires_approval = models.BooleanField(default=False)  # Booking approval required
-    image = models.ImageField(upload_to='room_images/', blank=True, null=True)  # Image upload
-    is_deleted = models.BooleanField(default=False)
-    created_at = models.DateTimeField(auto_now_add=True)  # Timestamp for room creation
-    updated_at = models.DateTimeField(auto_now=True)  # Timestamp for last update
+    name = models.CharField(max_length=100)
+    location = models.CharField(max_length=100)
+    capacity = models.IntegerField()
+    is_available = models.BooleanField(default=True)
+    requires_approval = models.BooleanField(default=False)
+    image_path = models.CharField(max_length=255, blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
         return f"{self.name} - {self.location}"
-    
-class UsageLog(models.Model):
-    room = models.ForeignKey(Room, on_delete=models.CASCADE, related_name="usage_logs")
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
-    start_time = models.DateTimeField(null=True, blank=True)
-    end_time = models.DateTimeField(null=True, blank=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    def __str__(self):
-        return f"Usage Log for {self.room.name} by {self.user.username}"
-
-
