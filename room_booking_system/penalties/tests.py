@@ -1,20 +1,63 @@
 from django.test import TestCase
-from django.contrib.auth import get_user_model
 from .models import Penalty
 from bookings.models import Booking
 from rooms.models import Room
+from django.contrib.auth.models import User
+from django.utils import timezone
+from django.db import models
 
-class PenaltyTestCase(TestCase):
+class PenaltyTests(TestCase):
     def setUp(self):
-        self.user = get_user_model().objects.create_user(username="testuser", password="testpass")
-        self.room = Room.objects.create(name="Test Room", location="First Floor", capacity=10)
+        self.user = User.objects.create(username="testuser", password="password")
+        self.room = Room.objects.create(name="Test Room", location="Floor 1", capacity=10)
         self.booking = Booking.objects.create(
-            user=self.user, room=self.room, start_time="2024-12-20T10:00:00Z", end_time="2024-12-20T12:00:00Z"
-        )
-        self.penalty = Penalty.objects.create(
-            user=self.user, booking=self.booking, reason="Test Penalty", amount=25.00
+            user=self.user,
+            room=self.room,
+            start_time=timezone.now() - timezone.timedelta(hours=2),
+            end_time=timezone.now() - timezone.timedelta(hours=1),
+            status='pending'
         )
 
-    def test_penalty_creation(self):
-        self.assertEqual(self.penalty.status, "unpaid")
-        self.assertEqual(self.penalty.amount, 25.00)
+    def test_create_penalty(self):
+        """
+        Test creating a penalty for a booking.
+        """
+        penalty = Penalty.objects.create(
+            user=self.user,
+            booking=self.booking,
+            reason="No-show",
+            amount=100.00,
+            status="unpaid"
+        )
+        self.assertEqual(Penalty.objects.count(), 1)
+        self.assertEqual(penalty.user, self.user)
+        self.assertEqual(penalty.amount, 100.00)
+        self.assertEqual(penalty.status, "unpaid")
+
+    def test_mark_penalty_as_paid(self):
+        """
+        Test marking a penalty as paid.
+        """
+        penalty = Penalty.objects.create(
+            user=self.user,
+            booking=self.booking,
+            reason="No-show",
+            amount=100.00,
+            status="unpaid"
+        )
+        penalty.status = "paid"
+        penalty.save()
+
+        self.assertEqual(penalty.status, "paid")
+
+    def test_unpaid_penalty_total(self):
+        """
+        Test calculating total unpaid penalties for a user.
+        """
+        Penalty.objects.create(user=self.user, booking=self.booking, reason="No-show", amount=50.00, status="unpaid")
+        Penalty.objects.create(user=self.user, booking=self.booking, reason="Late cancellation", amount=75.00, status="unpaid")
+
+        total_unpaid = Penalty.objects.filter(user=self.user, status="unpaid").aggregate(total=models.Sum('amount'))['total']
+
+        self.assertEqual(total_unpaid, 125.00)
+

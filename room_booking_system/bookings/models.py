@@ -24,5 +24,10 @@ class Booking(models.Model):
         return f"Booking: {self.room.name} by {self.user.username} ({self.status})"
 
     def clean(self):
-        if self.start_time >= self.end_time:
-            raise ValidationError("Start time must be before end time.")
+        overlapping_bookings = Booking.objects.filter(
+            room=self.room,
+            start_time__lt=self.end_time,
+            end_time__gt=self.start_time,
+        ).exclude(id=self.id)
+        if overlapping_bookings.exists():
+            raise ValidationError("This booking overlaps with an existing booking.")
