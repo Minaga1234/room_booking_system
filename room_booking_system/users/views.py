@@ -91,6 +91,16 @@ class UserViewSet(viewsets.ModelViewSet):
         user.set_password(new_password)
         user.save()
         return Response({"message": "Password updated successfully"})
+    
+    @action(detail=True, methods=['patch'], permission_classes=[IsAdmin])
+    def deactivate(self, request, pk=None):
+        """
+        Deactivate a user account (Admin only).
+        """
+        user = self.get_object()
+        user.is_active = False
+        user.save()
+        return Response({"message": f"User {user.username} has been deactivated."})
 
     def list(self, request, *args, **kwargs):
         """
