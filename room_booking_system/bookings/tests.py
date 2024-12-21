@@ -1,16 +1,27 @@
+# bookings/tests.py
 from django.test import TestCase
 from django.utils import timezone
 from .models import Booking
 from rooms.models import Room
 from notifications.models import Notification
 from penalties.models import Penalty
-from django.contrib.auth.models import User
+from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 
 class BookingTests(TestCase):
     def setUp(self):
-        self.user = User.objects.create(username="testuser", password="password")
-        self.admin = User.objects.create(username="admin", password="password", is_staff=True)
+        self.user = get_user_model().objects.create_user(
+            username="testuser",
+            password="password",
+            email="testuser@example.com",
+            role="student"
+        )
+        self.admin = get_user_model().objects.create_user(
+            username="admin",
+            password="password",
+            email="admin@example.com",
+            role="admin"
+        )
         self.room = Room.objects.create(name="Test Room", location="Floor 1", capacity=10)
 
     def test_create_booking(self):
@@ -57,8 +68,6 @@ class BookingTests(TestCase):
         # Check that a validation error is raised when calling full_clean()
         with self.assertRaises(ValidationError):
             overlapping_booking.full_clean()
-
-
 
     def test_approve_booking(self):
         """

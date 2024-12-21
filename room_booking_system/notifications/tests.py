@@ -1,10 +1,16 @@
+# notifications/tests.py
 from django.test import TestCase
 from .models import Notification
-from django.contrib.auth.models import User
+from django.contrib.auth import get_user_model
 
 class NotificationTests(TestCase):
     def setUp(self):
-        self.user = User.objects.create(username="testuser", password="password")
+        self.user = get_user_model().objects.create_user(
+            username="testuser",
+            password="password",
+            email="testuser@example.com",
+            role="student"
+        )
 
     def test_create_notification(self):
         """
