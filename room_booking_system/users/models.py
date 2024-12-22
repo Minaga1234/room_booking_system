@@ -1,6 +1,7 @@
 from django.contrib.auth.models import AbstractUser, BaseUserManager
 from django.db import models
 
+
 class CustomUserManager(BaseUserManager):
     """
     Custom manager for CustomUser.
@@ -23,6 +24,7 @@ class CustomUserManager(BaseUserManager):
             raise ValueError('Superuser must have role set to "admin".')
         return self.create_user(username, email, password, **extra_fields)
 
+
 class CustomUser(AbstractUser):
     ROLE_CHOICES = [
         ('admin', 'Admin'),
@@ -32,6 +34,22 @@ class CustomUser(AbstractUser):
     role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='student')
     phone_number = models.CharField(max_length=15, blank=True, null=True)
     is_active = models.BooleanField(default=True)
+
+    # Resolve conflicts with related_name
+    groups = models.ManyToManyField(
+        'auth.Group',
+        related_name='customuser_groups',  # Adjusted related_name
+        blank=True,
+        help_text='The groups this user belongs to.',
+        verbose_name='groups',
+    )
+    user_permissions = models.ManyToManyField(
+        'auth.Permission',
+        related_name='customuser_permissions',  # Adjusted related_name
+        blank=True,
+        help_text='Specific permissions for this user.',
+        verbose_name='user permissions',
+    )
 
     objects = CustomUserManager()  # Use the custom manager
 
