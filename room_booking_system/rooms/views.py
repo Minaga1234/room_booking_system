@@ -4,6 +4,8 @@ from rooms.models import Room  # Import for room-related queries
 from bookings.models import Booking  # Import for booking-related queries
 from users.models import CustomUser  # Import for user-related queries
 from django.contrib.auth.models import AnonymousUser
+from rest_framework.viewsets import ModelViewSet
+from .serializers import RoomSerializer
 
 # Wit.ai Token
 WIT_AI_TOKEN = "VMSEAGIHOYNO3UPF6RIL7CJ2OVJRKUP6"
@@ -88,3 +90,8 @@ def get_chatbot_response(user_input, logged_in_user):
 
     except Exception as e:
         return JsonResponse({"response": f"Error: {str(e)}"})
+
+# RoomViewSet to handle CRUD operations for Room
+class RoomViewSet(ModelViewSet):
+    queryset = Room.objects.all()
+    serializer_class = RoomSerializer
