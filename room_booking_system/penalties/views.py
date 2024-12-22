@@ -16,3 +16,10 @@ class PenaltyViewSet(viewsets.ModelViewSet):
             penalty.save()
             return Response({"message": "Penalty marked as paid."})
         return Response({"message": "Penalty is already paid."}, status=400)
+
+    @action(detail=False, methods=['get'])
+    def user_penalties(self, request):
+        user = request.user
+        penalties = Penalty.objects.filter(user=user)
+        serializer = self.get_serializer(penalties, many=True)
+        return Response(serializer.data)

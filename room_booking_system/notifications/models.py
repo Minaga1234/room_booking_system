@@ -16,3 +16,13 @@ class Notification(models.Model):
 
     def __str__(self):
         return f"Notification for {self.user.username}: {self.message[:30]}..."
+
+    @staticmethod
+    def unread_notifications(user):
+        """Retrieve all unread notifications for a specific user."""
+        return Notification.objects.filter(user=user, is_read=False)
+
+    def mark_as_read(self):
+        """Mark the notification as read."""
+        self.is_read = True
+        self.save()
