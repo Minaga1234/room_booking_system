@@ -25,8 +25,8 @@ urlpatterns = [
     path('rooms/', include('rooms.urls')),
     path('bookings/', include('bookings.urls')),
     path('penalties/', include('penalties.urls')),
-    path('notifications/', include('notifications.urls')),
-    path('chatbot/', include('chatbot.urls')),  
+    path('notifications/', include('notifications.urls')), 
+    path('chatbot/', include('chatbot.urls')), 
     path('analytics/', include('analytics.urls')),
     path('branding/', include('branding.urls')),
 ]
