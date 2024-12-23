@@ -31,7 +31,9 @@ def get_chatbot_response(user_input, logged_in_user):
 
         intents = wit_data.get("intents", [])
         intent = intents[0]["name"] if intents else None
-        user_name = logged_in_user.first_name if logged_in_user and not isinstance(logged_in_user, AnonymousUser) else "Guest"
+        user_name = (
+            logged_in_user.first_name if logged_in_user and not isinstance(logged_in_user, AnonymousUser) else "Guest"
+        )
 
         # Greeting Intent
         if intent == "greeting":
@@ -62,20 +64,32 @@ def get_chatbot_response(user_input, logged_in_user):
 
         # Search Room Intent
         elif intent == "search_room":
+            # Extract criteria from Wit.ai entities
             entities = wit_data.get("entities", {})
-            location = entities.get("location:location", [{}])[0].get("value")
-            capacity = entities.get("number:capacity", [{}])[0].get("value")
+            capacity = entities.get("capacity:capacity", [{}])[0].get("value")  # Extract capacity
+            location = entities.get("location:location", [{}])[0].get("value")  # Extract location
+
             filters = {}
-            if location:
-                filters["location__icontains"] = location
+            # Add capacity filter if available
             if capacity:
-                filters["capacity__gte"] = int(capacity)
+                try:
+                    capacity = int(capacity)  # Convert to integer
+                    filters["capacity__gte"] = capacity  # Add filter for "at least capacity"
+                except ValueError:
+                    return JsonResponse({"response": "Invalid capacity value. Please provide a valid number."})
+
+            # Add location filter if available
+            if location:
+                filters["location__icontains"] = location  # Add filter for location
+
+            # Apply filters
             matching_rooms = Room.objects.filter(**filters, is_available=True)
+
             if matching_rooms.exists():
                 room_list = ", ".join([f"{room.name} ({room.location})" for room in matching_rooms])
                 return JsonResponse({"response": f"The following rooms match your criteria: {room_list}."})
             else:
-                return JsonResponse({"response": "No rooms match your criteria."})
+                return JsonResponse({"response": "No rooms match your criteria. Please try different filters."})
 
         # Unknown Intent
         elif intent == "unknown":
@@ -88,4 +102,3 @@ def get_chatbot_response(user_input, logged_in_user):
     except Exception as e:
         logger.error(f"Unexpected error: {e}", exc_info=True)
         return JsonResponse({"response": f"Error: {str(e)}"})
-
