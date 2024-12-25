@@ -1,10 +1,10 @@
-from django.urls import path, include
+from django.urls import path
 from rest_framework.routers import DefaultRouter
 from .views import NotificationViewSet
 
-router = DefaultRouter()
-router.register(r'', NotificationViewSet)
+app_name = 'notifications'  # Set the namespace
 
-urlpatterns = [
-    path('', include(router.urls)),
-]
+router = DefaultRouter()
+router.register(r'', NotificationViewSet, basename='notification')
+
+urlpatterns = router.urls

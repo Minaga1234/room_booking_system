@@ -1,10 +1,15 @@
-from django.urls import path, include
+from django.urls import path
+from .views import AnalyticsViewSet, AnalyticsChartData, ChartView, weekly_utilization_heatmap
 from rest_framework.routers import DefaultRouter
-from .views import AnalyticsViewSet
 
+# Router for API endpoints
 router = DefaultRouter()
-router.register(r'', AnalyticsViewSet)
+router.register(r'', AnalyticsViewSet, basename='analytics')
 
 urlpatterns = [
-    path('', include(router.urls)),
+    path('chart-data/', AnalyticsChartData.as_view(), name='analytics-chart-data'),
+    path('charts/', ChartView.as_view(), name='analytics-charts'),
+    path('heatmap/', weekly_utilization_heatmap, name='weekly-utilization-heatmap'),
 ]
+
+urlpatterns += router.urls

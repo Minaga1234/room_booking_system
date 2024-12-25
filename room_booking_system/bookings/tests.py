@@ -1,111 +1,79 @@
-# bookings/tests.py
 from django.test import TestCase
-from django.utils import timezone
-from .models import Booking
+from django.utils.timezone import now, timedelta
+from bookings.models import Booking
 from rooms.models import Room
-from notifications.models import Notification
-from penalties.models import Penalty
+from analytics.models import Analytics
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 
-class BookingTests(TestCase):
+User = get_user_model()
+
+class BookingTestCase(TestCase):
     def setUp(self):
-        self.user = get_user_model().objects.create_user(
-            username="testuser",
-            password="password",
-            email="testuser@example.com",
-            role="student"
-        )
-        self.admin = get_user_model().objects.create_user(
-            username="admin",
-            password="password",
-            email="admin@example.com",
-            role="admin"
-        )
-        self.room = Room.objects.create(name="Test Room", location="Floor 1", capacity=10)
+        # Create test room and user
+        self.room = Room.objects.create(name="Test Room", capacity=10, location="Test Building")
+        self.user = User.objects.create_user(username="testuser", email="testuser@example.com", password="password")
+        self.start_time = now()
+        self.end_time = self.start_time + timedelta(hours=2)
 
-    def test_create_booking(self):
-        """
-        Test creating a booking and ensure it is saved correctly.
-        """
-        booking = Booking.objects.create(
-            user=self.user,
-            room=self.room,
-            start_time=timezone.now() + timezone.timedelta(hours=1),
-            end_time=timezone.now() + timezone.timedelta(hours=2)
-        )
-        self.assertEqual(Booking.objects.count(), 1)
-        self.assertEqual(booking.user, self.user)
-        self.assertEqual(booking.room, self.room)
-
-    def test_booking_overlap(self):
-        """
-        Test preventing overlapping bookings for the same room.
-        """
-        start_time = timezone.now() + timezone.timedelta(hours=1)
-        end_time = timezone.now() + timezone.timedelta(hours=2)
-
-        # Create the first booking
-        Booking.objects.create(
-            user=self.user, room=self.room, start_time=start_time, end_time=end_time
-        )
-
-        # Attempt to create an overlapping booking
-        overlapping_booking = Booking(
-            user=self.user, room=self.room, start_time=start_time, end_time=end_time
-        )
-
-        # Simulate the overlap check logic
-        overlapping = Booking.objects.filter(
-            room=self.room,
-            start_time__lt=end_time,
-            end_time__gt=start_time,
-        ).exists()
-
-        # Ensure overlapping booking detection works
-        self.assertTrue(overlapping)
-
-        # Check that a validation error is raised when calling full_clean()
+    def test_overlapping_booking_restriction(self):
+        """Ensure overlapping bookings are restricted."""
+        Booking.objects.create(user=self.user, room=self.room, start_time=self.start_time, end_time=self.end_time, status="approved")
         with self.assertRaises(ValidationError):
-            overlapping_booking.full_clean()
+            Booking.objects.create(user=self.user, room=self.room, start_time=self.start_time, end_time=self.end_time)
 
     def test_approve_booking(self):
-        """
-        Test approving a booking.
-        """
+        """Test approving a booking."""
         booking = Booking.objects.create(
             user=self.user,
             room=self.room,
-            start_time=timezone.now() + timezone.timedelta(hours=1),
-            end_time=timezone.now() + timezone.timedelta(hours=2),
-            status='pending'
+            start_time=self.start_time,
+            end_time=self.end_time,
+            price=100.0,  # Include price
         )
-        booking.status = 'approved'
-        booking.is_approved = True
-        booking.save()
-
-        self.assertEqual(booking.status, 'approved')
+        booking.approve()
         self.assertTrue(booking.is_approved)
+        self.assertEqual(booking.status, "approved")
 
-    def test_cancel_booking_with_penalty(self):
-        """
-        Test canceling a booking after its end time applies a penalty.
-        """
+    def test_cancel_booking(self):
+        """Test canceling a booking."""
+        booking = Booking.objects.create(user=self.user, room=self.room, start_time=self.start_time, end_time=self.end_time)
+        booking.cancel()
+        self.assertEqual(booking.status, "canceled")
+
+    def test_check_in_booking(self):
+        """Test checking in a booking."""
         booking = Booking.objects.create(
             user=self.user,
             room=self.room,
-            start_time=timezone.now() - timezone.timedelta(hours=2),
-            end_time=timezone.now() - timezone.timedelta(hours=1),
-            status='pending'
+            start_time=self.start_time,
+            end_time=self.end_time,
+            status="approved",
+            price=100.0,
         )
-        # Apply penalty logic
-        Penalty.objects.get_or_create(
-            user=booking.user,
-            booking=booking,
-            reason="Late cancellation",
-            defaults={"amount": 50.00, "status": "unpaid"}
-        )
+        booking.check_in()
+        self.assertTrue(booking.checked_in)
+        self.assertEqual(booking.status, "checked_in")  # Verify status is updated
 
-        penalty = Penalty.objects.filter(booking=booking).first()
-        self.assertIsNotNone(penalty)
-        self.assertEqual(penalty.amount, 50.00)
+    def test_dynamic_pricing(self):
+        """Ensure dynamic pricing is applied based on utilization rate."""
+        analytics = Analytics.objects.create(room=self.room, date=self.start_time.date(), utilization_rate=85.0)
+        price = Booking.calculate_dynamic_price(self.room, self.start_time, base_price=100)
+        self.assertEqual(price, 150.0)  # 50% increase for high utilization
+
+    def test_peak_usage_restriction(self):
+        """Test restriction of booking during peak hours."""
+        analytics = Analytics.objects.create(room=self.room, date=self.start_time.date(), utilization_rate=85.0, peak_hours={"10:00-11:00": 6})
+        booking = Booking(
+            user=self.user,
+            room=self.room,
+            start_time=self.start_time.replace(hour=10, minute=0),
+            end_time=self.start_time.replace(hour=11, minute=0),
+        )
+        with self.assertRaises(ValidationError):
+            booking.clean()
+
+    def test_booking_duration_validation(self):
+        """Ensure start time is before end time."""
+        with self.assertRaises(ValidationError):
+            Booking.objects.create(user=self.user, room=self.room, start_time=self.end_time, end_time=self.start_time)

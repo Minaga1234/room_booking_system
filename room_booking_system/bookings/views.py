@@ -9,6 +9,7 @@ from analytics.models import Analytics
 from datetime import date
 from django.utils import timezone
 from notifications.models import Notification
+from rest_framework.exceptions import ValidationError
 
 class BookingViewSet(viewsets.ModelViewSet):
     queryset = Booking.objects.all()
@@ -152,4 +153,11 @@ class BookingViewSet(viewsets.ModelViewSet):
 
         return Response({"message": "Check-in successful"})
 
-    
+    def validate_peak_usage(room, start_time):
+        """
+        Restrict bookings during peak hours.
+        """
+        analytics = Analytics.objects.filter(room=room, date=start_time.date()).first()
+        if analytics and analytics.utilization_rate > 80:  # Threshold for peak usage
+            raise ValidationError("Room is currently in high demand. Booking restrictions apply.")
+        
