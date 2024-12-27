@@ -4,6 +4,8 @@ from .models import Notification
 class NotificationSerializer(serializers.ModelSerializer):
     unread_count = serializers.SerializerMethodField()
 
+    unread_count = serializers.SerializerMethodField()
+
     class Meta:
         model = Notification
         fields = ['id', 'user', 'message', 'notification_type', 'is_read', 'created_at', 'unread_count']

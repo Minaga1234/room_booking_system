@@ -26,6 +26,10 @@ class NotificationViewSet(viewsets.ModelViewSet):
         Retrieve notifications for the logged-in user.
         Optional query parameter `unread` to filter unread notifications.
         """
+        """
+        Retrieve notifications for the logged-in user.
+        Optional query parameter `unread` to filter unread notifications.
+        """
         user = request.user
         unread_only = request.query_params.get('unread', 'false').lower() == 'true'
         notifications = self.get_queryset()
@@ -34,8 +38,12 @@ class NotificationViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(notifications, many=True)
         return Response(serializer.data)
 
+
     @action(detail=True, methods=['post'])
     def mark_as_read(self, request, pk=None):
+        """
+        Mark a specific notification as read.
+        """
         """
         Mark a specific notification as read.
         """

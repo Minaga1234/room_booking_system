@@ -17,11 +17,14 @@ class BookingViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['get'])
     def my_bookings(self, request):
+        """
+        Fetch bookings for the currently logged-in user.
+        """
         user = request.user
         user_bookings = Booking.objects.filter(user=user)
         serializer = self.get_serializer(user_bookings, many=True)
         return Response(serializer.data)
-    
+
     @action(detail=True, methods=['post'], permission_classes=[IsAdminUser])
     def approve(self, request, pk=None):
         """
@@ -30,11 +33,11 @@ class BookingViewSet(viewsets.ModelViewSet):
         booking = self.get_object()
         if booking.status == 'approved':
             return Response({"message": "Booking is already approved."}, status=400)
+
         booking.status = 'approved'
         booking.is_approved = True
         booking.save()
 
-        # Send a notification with the correct type
         Notification.objects.create(
             user=booking.user,
             message=f"Your booking for {booking.room.name} has been approved.",
@@ -42,19 +45,18 @@ class BookingViewSet(viewsets.ModelViewSet):
         )
         return Response({"message": "Booking approved."})
 
-
     @action(detail=True, methods=['post'], permission_classes=[IsAdminUser])
     def cancel(self, request, pk=None):
         """
-        Cancel a booking. Apply penalty if canceled after the end time and notify the user.
+        Cancel a booking. Apply a penalty if canceled late and notify the user.
         """
         booking = self.get_object()
         if booking.end_time < timezone.now():
-            self.check_for_penalty(booking)  # Apply penalty for late cancellation
+            self.check_for_penalty(booking)
+
         booking.status = 'canceled'
         booking.save()
 
-        # Send a notification with the correct type
         Notification.objects.create(
             user=booking.user,
             message=f"Your booking for {booking.room.name} has been canceled.",
@@ -64,7 +66,7 @@ class BookingViewSet(viewsets.ModelViewSet):
 
     def check_for_penalty(self, booking):
         """
-        Check if a penalty should be applied to the booking and notify the user if applicable.
+        Check if a penalty should be applied for late cancellation or no-show.
         """
         if booking.end_time < timezone.now() and not booking.is_approved:
             penalty, created = Penalty.objects.get_or_create(
@@ -72,7 +74,7 @@ class BookingViewSet(viewsets.ModelViewSet):
                 booking=booking,
                 reason="Late cancellation or no-show",
                 defaults={
-                    "amount": 50.00,  # Set your penalty amount
+                    "amount": 50.00,
                     "status": "unpaid"
                 }
             )
@@ -82,33 +84,22 @@ class BookingViewSet(viewsets.ModelViewSet):
                     message=f"A penalty of ${penalty.amount} has been imposed for {penalty.reason}.",
                     notification_type='penalty_reminder'
                 )
-                print(f"Penalty created for user {booking.user.username}: ${penalty.amount}.")
 
     def destroy(self, request, *args, **kwargs):
+        """
+        Apply penalty for late cancellation before deleting a booking.
+        """
         booking = self.get_object()
         self.check_for_penalty(booking)
         return super().destroy(request, *args, **kwargs)
-    
-    def update_booking_status(self, booking, status):
-        booking.status = status
-        booking.save()
-
-        # Create a notification
-        Notification.objects.create(
-            user=booking.user,
-            message=f"Your booking for {booking.room.name} has been {status}.",
-            notification_type='booking_update'
-        )
 
     def perform_create(self, serializer):
         """
         Create a new booking, update analytics, and notify the user.
         """
         booking = serializer.save()
-        booking.full_clean()  # Validate fields, including start_time and end_time
 
         try:
-            # Update analytics
             analytics, created = Analytics.objects.get_or_create(
                 room=booking.room,
                 date=date.today()
@@ -116,23 +107,40 @@ class BookingViewSet(viewsets.ModelViewSet):
             analytics.total_bookings += 1
             analytics.save()
         except Exception as e:
-            print(f"Analytics update failed: {e}")  # Log the error for debugging
+            print(f"Analytics update failed: {e}")
 
-        # Notify the user about the new booking
         Notification.objects.create(
             user=booking.user,
             message=f"Your booking for {booking.room.name} has been successfully created.",
             notification_type='booking_update'
         )
 
-
-
     def check_in(self, request, pk=None):
+        """
+        Mark a booking as checked in and update analytics.
+        """
         """
         Mark a booking as checked in and update analytics.
         """
         booking = self.get_object()
 
+        try:
+            # Update analytics
+            analytics, created = Analytics.objects.get_or_create(
+                room=booking.room,
+                date=date.today()
+            )
+            analytics.total_checkins += 1
+            analytics.save()
+        except Exception as e:
+            print(f"Check-in analytics update failed for booking {booking.id}: {e}")
+
+        # Notify the user about the check-in
+        Notification.objects.create(
+            user=booking.user,
+            message=f"You have successfully checked in for your booking at {booking.room.name}.",
+            notification_type='booking_update'
+        )
         try:
             # Update analytics
             analytics, created = Analytics.objects.get_or_create(

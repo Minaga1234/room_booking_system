@@ -8,7 +8,7 @@ from django.core.exceptions import ValidationError
 
 User = get_user_model()
 
-class BookingTestCase(TestCase):
+class BookingTests(TestCase):
     def setUp(self):
         # Create test room and user
         self.room = Room.objects.create(name="Test Room", capacity=10, location="Test Building")

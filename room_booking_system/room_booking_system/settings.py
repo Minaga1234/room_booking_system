@@ -39,6 +39,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
 
+
     # Project apps
     'users',
     'rooms',
@@ -49,6 +50,7 @@ INSTALLED_APPS = [
     'analytics',
     'branding',
 
+
     # Third-party apps
     'rest_framework',
     'rest_framework.authtoken',
@@ -56,10 +58,11 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    'corsheaders.middleware.CorsMiddleware',  # Added cors middleware
+    'django.middleware.common.CommonMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'corsheaders.middleware.CorsMiddleware',  # CORS Middleware
-    'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
@@ -85,7 +88,6 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'room_booking_system.wsgi.application'
-
 # Database Configuration
 DATABASES = {
     'default': {
@@ -179,3 +181,14 @@ CORS_ALLOWED_ORIGINS = [
 # Default Primary Key Field Type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
+
+AUTH_USER_MODEL = 'users.CustomUser'
+
+# CORS settings
+CORS_ALLOWED_ORIGINS = [
+    "http://127.0.0.1:5500",  # Replace with your frontend's address
+    "http://localhost:5500",
+]
+
+# Use this for development only (not recommended for production)
+# CORS_ALLOW_ALL_ORIGINS = True
