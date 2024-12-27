@@ -5,6 +5,16 @@ from rooms.models import Room
 from django.contrib.auth.models import User
 from django.utils import timezone
 from django.db import models
+from django.contrib.auth import get_user_model
+
+User = get_user_model()  # Use the custom user model
+
+def setUp(self):
+    self.user = User.objects.create_user(
+        username="testuser",
+        email="testuser@example.com",  # Add email field
+        password="password"
+    )
 
 class PenaltyTests(TestCase):
     def setUp(self):
@@ -60,4 +70,3 @@ class PenaltyTests(TestCase):
         total_unpaid = Penalty.objects.filter(user=self.user, status="unpaid").aggregate(total=models.Sum('amount'))['total']
 
         self.assertEqual(total_unpaid, 125.00)
-
