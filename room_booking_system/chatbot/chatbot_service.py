@@ -48,6 +48,27 @@ def get_chatbot_response(user_input, logged_in_user):
             else:
                 return JsonResponse({"response": f"No rooms are available for booking, {user_name}."})
 
+        # Check Room Occupancy Intent
+        elif intent == "check_room_occupancy":
+            entities = wit_data.get("entities", {})
+            room_name = entities.get("room_name:room_name", [{}])[0].get("value")
+
+            if not room_name:
+                return JsonResponse({"response": "Please specify the room name to check its occupancy."})
+
+            # Normalize input and compare
+            room_name = room_name.strip().lower()
+            room = Room.objects.filter(name__iexact=room_name).first()
+
+            if room:
+                if room.is_available:
+                    return JsonResponse({"response": f"The {room.name} is currently available."})
+                else:
+                    return JsonResponse({"response": f"The {room.name} is currently occupied."})
+            else:
+                available_rooms = ", ".join(Room.objects.values_list("name", flat=True))
+                return JsonResponse({"response": f"I couldn't find a room named {room_name}. Available rooms are: {available_rooms}"})
+
         # Cancel Booking Intent
         elif intent == "cancel_booking":
             if logged_in_user and logged_in_user.is_authenticated:

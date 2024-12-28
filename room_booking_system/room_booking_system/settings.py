@@ -94,7 +94,7 @@ DATABASES = {
         'ENGINE': 'django.db.backends.mysql',
         'NAME': 'room_booking_system',
         'USER': 'root',
-        'PASSWORD': 'Cponline@99',
+        'PASSWORD': 'mysql',
         'HOST': '127.0.0.1',
         'PORT': '3306',
     }
