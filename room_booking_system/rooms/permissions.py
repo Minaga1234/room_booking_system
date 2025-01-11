@@ -9,3 +9,10 @@ class IsAdminOrReadOnly(BasePermission):
         if request.method in SAFE_METHODS:
             return True
         return request.user.is_authenticated and request.user.role == 'admin'
+
+class IsAdminOrStaff(BasePermission):
+    """
+    Allow access for admin and staff roles.
+    """
+    def has_permission(self, request, view):
+        return request.user.is_authenticated and request.user.role in ['admin', 'staff']

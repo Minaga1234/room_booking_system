@@ -21,8 +21,10 @@ class UserViewSet(viewsets.ModelViewSet):
         """
         Assign permissions based on the action being performed.
         """
-        if self.action in ['create', 'login']:
-            return [permissions.AllowAny()]
+        if self.action in ['create']:
+            return [IsAdmin()]  # Restrict user creation to admins only
+        elif self.action in ['login']:
+            return [permissions.AllowAny()]  # Allow anyone to log in
         elif self.action in ['list', 'destroy']:
             return [IsAdmin()]
         elif self.action in ['update', 'partial_update', 'deactivate']:
@@ -33,13 +35,12 @@ class UserViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['post'], permission_classes=[permissions.AllowAny])
     def login(self, request):
-        """
-        Handle user login and return JWT tokens.
-        """
-        username = request.data.get('username')
+        email = request.data.get('email')
         password = request.data.get('password')
-        user = authenticate(username=username, password=password)
-        if user:
+        try:
+            user = CustomUser.objects.get(email=email)
+            if not user.check_password(password):
+                return Response({"error": "Invalid credentials"}, status=401)
             if not user.is_active:
                 return Response({"error": "Account is inactive"}, status=403)
             refresh = RefreshToken.for_user(user)
@@ -48,7 +49,8 @@ class UserViewSet(viewsets.ModelViewSet):
                 "access": str(refresh.access_token),
                 "role": user.role,
             })
-        return Response({"error": "Invalid credentials"}, status=401)
+        except CustomUser.DoesNotExist:
+            return Response({"error": "User with this email does not exist."}, status=401)
 
     @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
     def profile(self, request):
@@ -104,7 +106,7 @@ class UserViewSet(viewsets.ModelViewSet):
 
     def list(self, request, *args, **kwargs):
         """
-        Disable the list view for users.
+        Disable the list view for all users.
         """
         return Response({"detail": "Not allowed."}, status=405)
 

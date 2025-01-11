@@ -1,6 +1,7 @@
 from django.db import models
 from django.conf import settings
 from bookings.models import Booking
+from notifications.models import Notification  # Import Notification model
 
 class Penalty(models.Model):
     STATUS_CHOICES = (
@@ -21,5 +22,40 @@ class Penalty(models.Model):
 
     @staticmethod
     def get_unpaid_penalties(user):
-        """Calculate total unpaid penalties for a user."""
+        """
+        Calculate total unpaid penalties for a user.
+        """
         return Penalty.objects.filter(user=user, status='unpaid').aggregate(total=models.Sum('amount'))['total'] or 0.00
+
+    @staticmethod
+    def create_penalty(user, booking, reason, amount):
+        """
+        Helper method to create a penalty and send a notification.
+        """
+        penalty = Penalty.objects.create(
+            user=user,
+            booking=booking,
+            reason=reason,
+            amount=amount
+        )
+        # Notify the user about the penalty
+        Notification.create_notification(
+            user=user,
+            message=f"A penalty of ${amount:.2f} has been imposed for {reason}.",
+            notification_type='penalty_reminder'
+        )
+        return penalty
+
+    def mark_as_paid(self):
+        """
+        Mark the penalty as paid and notify the user.
+        """
+        self.status = 'paid'
+        self.save()
+
+        # Notify the user about the payment
+        Notification.create_notification(
+            user=self.user,
+            message=f"The penalty of ${self.amount:.2f} for {self.reason} has been marked as paid.",
+            notification_type='penalty_reminder'
+        )

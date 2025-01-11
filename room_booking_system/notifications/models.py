@@ -10,6 +10,7 @@ class Notification(models.Model):
     )
 
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    booking = models.ForeignKey('bookings.Booking', on_delete=models.CASCADE, null=True, blank=True)
     message = models.TextField()
     notification_type = models.CharField(max_length=50, choices=NOTIFICATION_TYPES, default='general')
     is_read = models.BooleanField(default=False)
@@ -37,3 +38,13 @@ class Notification(models.Model):
         """Mark the notification as unread."""
         self.is_read = False
         self.save()
+
+    def mark_as_paid(self):
+        self.status = 'paid'
+        self.save()
+        Notification.objects.create(
+            user=self.user,
+            message=f"Your penalty of ${self.amount:.2f} has been marked as paid.",
+            notification_type='penalty_update'
+        )
+

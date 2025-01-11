@@ -16,8 +16,16 @@ class BookingSerializer(serializers.ModelSerializer):
         ).exists():
             raise serializers.ValidationError("Room is already booked for this time.")
 
-        # Validate dynamic price
-        data['price'] = Booking.calculate_dynamic_price(
-            data['room'], data['start_time'], base_price=100
-        )
+        # Validate peak usage
+        analytics = Analytics.objects.filter(room=data['room'], date=data['start_time'].date()).first()
+        if analytics and analytics.utilization_rate > 80 and data['user'].role == "student":
+            raise serializers.ValidationError("Bookings during peak usage are restricted for students.")
+
+        # Validate start and end time logic
+        if data['start_time'] >= data['end_time']:
+            raise serializers.ValidationError("Start time must be earlier than end time.")
+
+        # Dynamic price calculation
+        data['price'] = Booking.calculate_dynamic_price(data['room'], data['start_time'], base_price=100)
+
         return data

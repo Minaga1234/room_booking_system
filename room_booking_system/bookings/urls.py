@@ -3,8 +3,6 @@ from rest_framework.routers import DefaultRouter
 from .views import BookingViewSet
 
 router = DefaultRouter()
-router.register(r'', BookingViewSet)
+router.register(r'', BookingViewSet, basename="booking")  # Removed the 'bookings' prefix
 
-urlpatterns = [
-    path('', include(router.urls)),
-]
+urlpatterns = router.urls  # Directly use router.urls without additional prefixes

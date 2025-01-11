@@ -6,4 +6,3 @@ router = DefaultRouter()
 router.register(r'', UserViewSet, basename='user')  # Register the main viewset
 
 urlpatterns = router.urls
-

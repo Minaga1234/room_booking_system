@@ -9,12 +9,17 @@ class CustomUserManager(BaseUserManager):
     def create_user(self, username, email, password=None, **extra_fields):
         if not email:
             raise ValueError('The Email field must be set.')
+        if CustomUser.objects.filter(username=username).exists():
+            raise ValueError('A user with this username already exists.')
+        if CustomUser.objects.filter(email=email).exists():
+            raise ValueError('A user with this email already exists.')
         email = self.normalize_email(email)
         extra_fields.setdefault('is_active', True)
         user = self.model(username=username, email=email, **extra_fields)
         user.set_password(password)
         user.save(using=self._db)
         return user
+
 
     def create_superuser(self, username, email, password=None, **extra_fields):
         extra_fields.setdefault('is_staff', True)
@@ -30,11 +35,15 @@ class CustomUser(AbstractUser):
         ('staff', 'Staff'),
         ('student', 'Student'),
     ]
+    email = models.EmailField(unique=True)  # Ensure email is unique
+    username = models.CharField(max_length=150, unique=True, blank=True, null=True)  # Optional username
     role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='student')
     phone_number = models.CharField(max_length=15, blank=True, null=True)
-    is_active = models.BooleanField(default=True)
 
-    objects = CustomUserManager()  # Use the custom manager
+    USERNAME_FIELD = 'email'  # Use email as the primary identifier
+    REQUIRED_FIELDS = ['username']  # Add username as a required field if needed
+
+    objects = CustomUserManager()
 
     def __str__(self):
-        return self.username
+        return self.email  # Return email for representation
