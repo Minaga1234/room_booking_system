@@ -5,13 +5,20 @@ from rest_framework.decorators import action
 from .models import Room, UsageLog
 from .serializers import RoomSerializer, UsageLogSerializer
 from .permissions import IsAdminOrReadOnly  # Custom permission
+<<<<<<< HEAD
 from rest_framework.permissions import IsAuthenticated
 from users.permissions import IsAdminOrStaff, IsAdmin
+=======
+>>>>>>> 574110dd6dcb3717a7e05795ad1887ba00793b63
 
 class RoomViewSet(viewsets.ModelViewSet):
     queryset = Room.objects.all()
     serializer_class = RoomSerializer
+<<<<<<< HEAD
     permission_classes = [IsAuthenticated, IsAdminOrReadOnly]  # Admins can modify; others can only view
+=======
+    permission_classes = [IsAdminOrReadOnly]  # Admins can modify; others can only view
+>>>>>>> 574110dd6dcb3717a7e05795ad1887ba00793b63
 
     def get_queryset(self):
         queryset = super().get_queryset()
@@ -73,6 +80,7 @@ class RoomViewSet(viewsets.ModelViewSet):
         log.end_time = timezone.now()
         log.save()
         return Response({"message": "Room usage ended.", "log": UsageLogSerializer(log).data})
+<<<<<<< HEAD
     
     @action(detail=True, methods=['post'], permission_classes=[IsAdmin])
     def approve_room(self, request, pk=None):
@@ -83,3 +91,5 @@ class RoomViewSet(viewsets.ModelViewSet):
         room.requires_approval = False
         room.save()
         return Response({"message": f"Room {room.name} approved."})
+=======
+>>>>>>> 574110dd6dcb3717a7e05795ad1887ba00793b63

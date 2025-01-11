@@ -1,6 +1,8 @@
+# users/admin.py
 from django.contrib import admin
 from .models import CustomUser
 
+<<<<<<< HEAD
 
 @admin.register(CustomUser)
 class CustomUserAdmin(admin.ModelAdmin):
@@ -23,3 +25,10 @@ class CustomUserAdmin(admin.ModelAdmin):
         queryset.update(role='staff')
         self.message_user(request, "Selected users have been updated to 'staff' role.")
     set_to_staff.short_description = "Set selected users as staff"
+=======
+@admin.register(CustomUser)
+class CustomUserAdmin(admin.ModelAdmin):
+    list_display = ['username', 'email', 'role', 'phone_number', 'is_active']
+    search_fields = ['username', 'email']
+    list_filter = ['role', 'is_active']
+>>>>>>> 574110dd6dcb3717a7e05795ad1887ba00793b63

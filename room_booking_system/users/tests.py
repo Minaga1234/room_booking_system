@@ -1,5 +1,7 @@
+#Users/tests.py
 from django.test import TestCase
 from rest_framework.test import APIClient
+<<<<<<< HEAD
 from rest_framework import status
 from users.models import CustomUser
 from django.utils.timezone import now
@@ -14,8 +16,39 @@ class CustomUserModelTestCase(TestCase):
             email="test@example.com",
             password="password",
             role="student",
-        )
+=======
+from users.models import CustomUser
 
+class UserTests(TestCase):
+    def setUp(self):
+        # Create an admin user
+        self.admin_user = CustomUser.objects.create_user(
+            username="AdminUser",
+            email="admin@example.com",
+            password="AdminPass@123",
+            role="admin",
+            is_active=True
+>>>>>>> 574110dd6dcb3717a7e05795ad1887ba00793b63
+        )
+        # Create a staff user
+        self.staff_user = CustomUser.objects.create_user(
+            username="StaffUser",
+            email="staff@example.com",
+            password="StaffPass@123",
+            role="staff",
+            is_active=True
+        )
+        # Create a student user
+        self.student_user = CustomUser.objects.create_user(
+            username="StudentUser",
+            email="student@example.com",
+            password="StudentPass@123",
+            role="student",
+            is_active=True
+        )
+        self.client = APIClient()
+
+<<<<<<< HEAD
     def test_create_superuser(self):
         """Test that a superuser can be created successfully."""
         admin_user = CustomUser.objects.create_superuser(
@@ -159,3 +192,34 @@ class UserPermissionTestCase(TestCase):
         self.client.force_authenticate(user=self.student_user)  # Authenticate as a student user
         response = self.client.get("/api/users/")
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+=======
+    def test_user_login(self):
+        # Test login for admin user
+        response = self.client.post(
+            "/api/token/",
+            {"username": "AdminUser", "password": "AdminPass@123"}
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("access", response.data)
+
+    def test_invalid_login(self):
+        # Test login with invalid credentials
+        response = self.client.post(
+            "/api/token/",
+            {"username": "AdminUser", "password": "WrongPassword"}
+        )
+        self.assertEqual(response.status_code, 401)
+
+    def test_view_profile(self):
+        # Authenticate as admin user
+        response = self.client.post(
+            "/api/token/",
+            {"username": "AdminUser", "password": "AdminPass@123"}
+        )
+        access_token = response.data["access"]
+
+        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {access_token}")
+        response = self.client.get("/api/users/profile/")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["username"], "AdminUser")
+>>>>>>> 574110dd6dcb3717a7e05795ad1887ba00793b63

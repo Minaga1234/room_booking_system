@@ -21,10 +21,15 @@ class UserViewSet(viewsets.ModelViewSet):
         """
         Assign permissions based on the action being performed.
         """
+<<<<<<< HEAD
         if self.action in ['create']:
             return [IsAdmin()]  # Restrict user creation to admins only
         elif self.action in ['login']:
             return [permissions.AllowAny()]  # Allow anyone to log in
+=======
+        if self.action in ['create', 'login']:
+            return [permissions.AllowAny()]
+>>>>>>> 574110dd6dcb3717a7e05795ad1887ba00793b63
         elif self.action in ['list', 'destroy']:
             return [IsAdmin()]
         elif self.action in ['update', 'partial_update', 'deactivate']:
@@ -35,12 +40,22 @@ class UserViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['post'], permission_classes=[permissions.AllowAny])
     def login(self, request):
+<<<<<<< HEAD
         email = request.data.get('email')
         password = request.data.get('password')
         try:
             user = CustomUser.objects.get(email=email)
             if not user.check_password(password):
                 return Response({"error": "Invalid credentials"}, status=401)
+=======
+        """
+        Handle user login and return JWT tokens.
+        """
+        username = request.data.get('username')
+        password = request.data.get('password')
+        user = authenticate(username=username, password=password)
+        if user:
+>>>>>>> 574110dd6dcb3717a7e05795ad1887ba00793b63
             if not user.is_active:
                 return Response({"error": "Account is inactive"}, status=403)
             refresh = RefreshToken.for_user(user)
@@ -49,8 +64,12 @@ class UserViewSet(viewsets.ModelViewSet):
                 "access": str(refresh.access_token),
                 "role": user.role,
             })
+<<<<<<< HEAD
         except CustomUser.DoesNotExist:
             return Response({"error": "User with this email does not exist."}, status=401)
+=======
+        return Response({"error": "Invalid credentials"}, status=401)
+>>>>>>> 574110dd6dcb3717a7e05795ad1887ba00793b63
 
     @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
     def profile(self, request):
@@ -106,7 +125,11 @@ class UserViewSet(viewsets.ModelViewSet):
 
     def list(self, request, *args, **kwargs):
         """
+<<<<<<< HEAD
         Disable the list view for all users.
+=======
+        Disable the list view for users.
+>>>>>>> 574110dd6dcb3717a7e05795ad1887ba00793b63
         """
         return Response({"detail": "Not allowed."}, status=405)
 

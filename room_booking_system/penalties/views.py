@@ -79,12 +79,6 @@ class PenaltyViewSet(viewsets.ModelViewSet):
         return queryset.order_by('-created_at')
 
 
-
-
-
-
-
-    
     @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
     def user_penalties(self, request):
         user = self.request.user

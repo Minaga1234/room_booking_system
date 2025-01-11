@@ -1,6 +1,7 @@
 from django.contrib import admin
 from .models import Room, UsageLog
 
+<<<<<<< HEAD
 
 class UsageLogInline(admin.TabularInline):
     model = UsageLog
@@ -21,3 +22,10 @@ class RoomAdmin(admin.ModelAdmin):
         queryset.update(is_deleted=False)
         self.message_user(request, "Selected rooms have been restored.")
     restore_rooms.short_description = "Restore selected rooms"
+=======
+@admin.register(Room)
+class RoomAdmin(admin.ModelAdmin):
+    list_display = ('name', 'location', 'capacity', 'is_available', 'requires_approval')
+    search_fields = ('name', 'location')
+    list_filter = ('is_available', 'requires_approval')
+>>>>>>> 574110dd6dcb3717a7e05795ad1887ba00793b63
