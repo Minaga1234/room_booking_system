@@ -34,8 +34,15 @@ class UserViewSet(viewsets.ModelViewSet):
         """
         Assign permissions based on action.
         """
+<<<<<<< HEAD
         if self.action in ['register_user', 'login']:
             return [permissions.AllowAny()]
+=======
+        if self.action in ['create']:
+            return [IsAdmin()]  # Restrict user creation to admins only
+        elif self.action in ['login']:
+            return [permissions.AllowAny()]  # Allow anyone to log in
+>>>>>>> 95be7a5d30d503825ae028e43040e0af7f1c5109
         elif self.action in ['list', 'destroy']:
             return [IsAdmin()]
         elif self.action in ['update', 'partial_update', 'deactivate']:
@@ -56,17 +63,25 @@ class UserViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['post'], permission_classes=[permissions.AllowAny])
     def login(self, request):
+<<<<<<< HEAD
         """
         User login with email and password.
         """
+=======
+>>>>>>> 95be7a5d30d503825ae028e43040e0af7f1c5109
         email = request.data.get('email')
         password = request.data.get('password')
         try:
             user = CustomUser.objects.get(email=email)
+<<<<<<< HEAD
         except CustomUser.DoesNotExist:
             return Response({"error": "Invalid email or password"}, status=status.HTTP_401_UNAUTHORIZED)
 
         if user.check_password(password):
+=======
+            if not user.check_password(password):
+                return Response({"error": "Invalid credentials"}, status=401)
+>>>>>>> 95be7a5d30d503825ae028e43040e0af7f1c5109
             if not user.is_active:
                 return Response({"error": "Account is inactive"}, status=status.HTTP_403_FORBIDDEN)
 
@@ -76,7 +91,12 @@ class UserViewSet(viewsets.ModelViewSet):
                 "access": str(refresh.access_token),
                 "role": user.role,
             })
+<<<<<<< HEAD
         return Response({"error": "Invalid email or password"}, status=status.HTTP_401_UNAUTHORIZED)
+=======
+        except CustomUser.DoesNotExist:
+            return Response({"error": "User with this email does not exist."}, status=401)
+>>>>>>> 95be7a5d30d503825ae028e43040e0af7f1c5109
 
     @action(detail=False, methods=['get'], permission_classes=[permissions.IsAuthenticated])
     def profile(self, request):
@@ -114,7 +134,11 @@ class UserViewSet(viewsets.ModelViewSet):
 
     def list(self, request, *args, **kwargs):
         """
+<<<<<<< HEAD
         Disable listing all users.
+=======
+        Disable the list view for all users.
+>>>>>>> 95be7a5d30d503825ae028e43040e0af7f1c5109
         """
         return Response({"detail": "Not allowed."}, status=status.HTTP_405_METHOD_NOT_ALLOWED)
 

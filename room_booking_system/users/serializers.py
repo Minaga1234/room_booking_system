@@ -33,6 +33,14 @@ class UserSerializer(serializers.ModelSerializer):
         if CustomUser.objects.filter(email=value).exists():
             raise serializers.ValidationError("This email is already registered.")
         return value
+<<<<<<< HEAD
+=======
+    
+    def validate_username(self, value):
+        if CustomUser.objects.filter(username=value).exists():
+            raise serializers.ValidationError("This username is already taken.")
+        return value
+>>>>>>> 95be7a5d30d503825ae028e43040e0af7f1c5109
 
     def validate_phone_number(self, value):
         """

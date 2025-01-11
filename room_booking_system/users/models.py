@@ -10,13 +10,22 @@ class CustomUserManager(BaseUserManager):
 
     def create_user(self, username, email, password=None, **extra_fields):
         if not email:
+<<<<<<< HEAD
             raise ValueError("The Email field must be set.")
+=======
+            raise ValueError('The Email field must be set.')
+        if CustomUser.objects.filter(username=username).exists():
+            raise ValueError('A user with this username already exists.')
+        if CustomUser.objects.filter(email=email).exists():
+            raise ValueError('A user with this email already exists.')
+>>>>>>> 95be7a5d30d503825ae028e43040e0af7f1c5109
         email = self.normalize_email(email)
         extra_fields.setdefault("is_active", True)
         user = self.model(username=username, email=email, **extra_fields)
         user.set_password(password)
         user.save(using=self._db)
         return user
+
 
     def create_superuser(self, username, email, password=None, **extra_fields):
         extra_fields.setdefault("is_staff", True)
@@ -33,6 +42,7 @@ class CustomUser(AbstractUser):
         ("staff", "Staff"),
         ("student", "Student"),
     ]
+<<<<<<< HEAD
 
     role = models.CharField(max_length=20, choices=ROLE_CHOICES, default="student")
     phone_number = models.CharField(
@@ -47,10 +57,20 @@ class CustomUser(AbstractUser):
         ],
     )
     is_active = models.BooleanField(default=True)
+=======
+    email = models.EmailField(unique=True)  # Ensure email is unique
+    username = models.CharField(max_length=150, unique=True, blank=True, null=True)  # Optional username
+    role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='student')
+    phone_number = models.CharField(max_length=15, blank=True, null=True)
+>>>>>>> 95be7a5d30d503825ae028e43040e0af7f1c5109
 
-    objects = CustomUserManager()  # Use the custom manager
+    USERNAME_FIELD = 'email'  # Use email as the primary identifier
+    REQUIRED_FIELDS = ['username']  # Add username as a required field if needed
+
+    objects = CustomUserManager()
 
     def __str__(self):
+<<<<<<< HEAD
         return self.username
 
     class Meta:
@@ -77,3 +97,6 @@ class UserProfile(models.Model):
     class Meta:
         verbose_name = "User Profile"
         verbose_name_plural = "User Profiles"
+=======
+        return self.email  # Return email for representation
+>>>>>>> 95be7a5d30d503825ae028e43040e0af7f1c5109

@@ -54,7 +54,7 @@ def update_analytics_on_delete(sender, instance, **kwargs):
     """
     start_time = localtime(instance.start_time)
     analytics, _ = Analytics.objects.get_or_create(room=instance.room, date=start_time.date())
-    analytics.total_bookings -= 1
+    analytics.total_bookings = max(analytics.total_bookings - 1, 0)  # Prevent negative totals
 
     # Recalculate total usage time
     bookings = Booking.objects.filter(room=instance.room, start_time__date=start_time.date())
@@ -68,6 +68,7 @@ def update_analytics_on_delete(sender, instance, **kwargs):
 
     analytics.save()
 
+
 @receiver(post_save, sender=Analytics)
 def analytics_notification_handler(sender, instance, **kwargs):
     """
@@ -78,18 +79,21 @@ def analytics_notification_handler(sender, instance, **kwargs):
     # Notify for underutilized rooms
     if instance.utilization_rate < 30:
         for admin in admin_users:
-            Notification.objects.create(
+            Notification.create_notification(
                 user=admin,
-                message=f"Room {instance.room.name} has low utilization: {instance.utilization_rate:.2f}%."
+                message=f"Room {instance.room.name} has low utilization: {instance.utilization_rate:.2f}%.",
+                notification_type='admin_alert',
             )
 
     # Notify for overbooked rooms
     elif instance.utilization_rate > 80:
         for admin in admin_users:
-            Notification.objects.create(
+            Notification.create_notification(
                 user=admin,
-                message=f"Room {instance.room.name} is in high demand with utilization: {instance.utilization_rate:.2f}%."
+                message=f"Room {instance.room.name} is in high demand with utilization: {instance.utilization_rate:.2f}%.",
+                notification_type='admin_alert',
             )
+
             
 @receiver(post_save, sender=Booking)
 def update_total_checkins(sender, instance, created, **kwargs):

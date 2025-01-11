@@ -12,6 +12,7 @@ from notifications.models import Notification
 from rest_framework.exceptions import ValidationError
 from rest_framework.decorators import api_view
 from django.db.models import Count
+from penalties.views import PenaltyViewSet
 
 class BookingViewSet(viewsets.ModelViewSet):
     queryset = Booking.objects.all()
@@ -50,12 +51,10 @@ class BookingViewSet(viewsets.ModelViewSet):
     
     @action(detail=True, methods=['post'], permission_classes=[IsAdminUser])
     def cancel(self, request, pk=None):
-        """
-        Cancel a booking. Apply a penalty if canceled late and notify the user.
-        """
+        """Cancel a booking and apply penalties if needed."""
         booking = self.get_object()
-        if booking.end_time < timezone.now():
-            self.check_for_penalty(booking)
+        if booking.status not in ['canceled', 'checked_in']:
+            PenaltyViewSet.apply_penalty(booking)
 
         booking.status = 'canceled'
         booking.save()
@@ -189,3 +188,22 @@ class BookingViewSet(viewsets.ModelViewSet):
         """
         analytics = Analytics.objects.all().values('room__name', 'date', 'total_bookings', 'total_checkins')
         return Response(analytics)
+    def apply_penalty(self, booking, reason="Late cancellation or no-show"):
+        """
+        Apply penalty to the user for specific reasons.
+        """
+        penalty, created = Penalty.objects.get_or_create(
+            user=booking.user,
+            booking=booking,
+            reason=reason,
+            defaults={
+                "amount": booking.calculate_penalty(),
+                "status": "unpaid"
+            }
+        )
+        if created:
+            Notification.objects.create(
+                user=booking.user,
+                message=f"A penalty of ${penalty.amount} has been imposed for {penalty.reason}.",
+                notification_type='penalty_reminder'
+            )

@@ -5,11 +5,13 @@ from rest_framework.decorators import action
 from .models import Room, UsageLog
 from .serializers import RoomSerializer, UsageLogSerializer
 from .permissions import IsAdminOrReadOnly  # Custom permission
+from rest_framework.permissions import IsAuthenticated
+from users.permissions import IsAdminOrStaff, IsAdmin
 
 class RoomViewSet(viewsets.ModelViewSet):
     queryset = Room.objects.all()
     serializer_class = RoomSerializer
-    permission_classes = [IsAdminOrReadOnly]  # Admins can modify; others can only view
+    permission_classes = [IsAuthenticated, IsAdminOrReadOnly]  # Admins can modify; others can only view
 
     def get_queryset(self):
         queryset = super().get_queryset()
@@ -71,3 +73,13 @@ class RoomViewSet(viewsets.ModelViewSet):
         log.end_time = timezone.now()
         log.save()
         return Response({"message": "Room usage ended.", "log": UsageLogSerializer(log).data})
+    
+    @action(detail=True, methods=['post'], permission_classes=[IsAdmin])
+    def approve_room(self, request, pk=None):
+        """
+        Example action where only admins can approve rooms.
+        """
+        room = self.get_object()
+        room.requires_approval = False
+        room.save()
+        return Response({"message": f"Room {room.name} approved."})

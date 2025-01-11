@@ -26,5 +26,3 @@ class UsageLog(models.Model):
 
     def __str__(self):
         return f"Usage Log for {self.room.name} by {self.user.username}"
-
-

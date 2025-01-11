@@ -25,8 +25,8 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/users/', include('users.urls')),
     path('api/rooms/', include('rooms.urls')),
+    path('api/bookings/', include('bookings.urls')),
     path("api/branding/", include("branding.urls")),
-    path('bookings/', include('bookings.urls')),
     path('penalties/', include('penalties.urls')),
     path('notifications/', include('notifications.urls', namespace='notifications')),
     path('chatbot/', include('chatbot.urls')),
@@ -38,5 +38,6 @@ urlpatterns = [
 
 # Add static and media files handling in development mode
 if settings.DEBUG:
+    urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 

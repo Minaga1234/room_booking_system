@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Booking
+from .models import Booking, Analytics
 from branding.models import Degree  # Import the Degree model
 
 class BookingSerializer(serializers.ModelSerializer):
@@ -33,6 +33,17 @@ class BookingSerializer(serializers.ModelSerializer):
             start_time=data['start_time'],
             base_price=100  # Default base price
         )
+        # Validate peak usage
+        analytics = Analytics.objects.filter(room=data['room'], date=data['start_time'].date()).first()
+        if analytics and analytics.utilization_rate > 80 and data['user'].role == "student":
+            raise serializers.ValidationError("Bookings during peak usage are restricted for students.")
+
+        # Validate start and end time logic
+        if data['start_time'] >= data['end_time']:
+            raise serializers.ValidationError("Start time must be earlier than end time.")
+
+        # Dynamic price calculation
+        data['price'] = Booking.calculate_dynamic_price(data['room'], data['start_time'], base_price=100)
 
         return data
 
