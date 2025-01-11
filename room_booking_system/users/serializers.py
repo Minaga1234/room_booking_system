@@ -1,4 +1,3 @@
-# users/serializers.py
 from rest_framework import serializers
 from django.contrib.auth.hashers import make_password
 from .models import CustomUser
@@ -11,25 +10,34 @@ class UserSerializer(serializers.ModelSerializer):
             'password': {'write_only': True}  # Ensure password is write-only
         }
 
-    # Hash password before saving
     def create(self, validated_data):
+        """
+        Hash password before saving a new user.
+        """
         validated_data['password'] = make_password(validated_data['password'])
         return super().create(validated_data)
 
-    # Optional: Ensure that updates handle password properly
     def update(self, instance, validated_data):
+        """
+        Handle password updates separately while ensuring password is hashed.
+        """
         password = validated_data.pop('password', None)
         if password:
             instance.password = make_password(password)
         return super().update(instance, validated_data)
-    
+
     def validate_email(self, value):
+        """
+        Validate email to ensure uniqueness.
+        """
         if CustomUser.objects.filter(email=value).exists():
             raise serializers.ValidationError("This email is already registered.")
         return value
-    
+
     def validate_phone_number(self, value):
+        """
+        Validate phone number format.
+        """
         if not value.isdigit() or len(value) not in [10, 15]:
             raise serializers.ValidationError("Enter a valid phone number.")
         return value
-

@@ -9,63 +9,109 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import viewsets
 from .models import Analytics
+from bookings.models import Booking 
 from .serializers import AnalyticsSerializer
 from django.core.management.base import BaseCommand
 from prophet import Prophet
 import pandas as pd
-from analytics.models import Analytics
 from datetime import timedelta, date
-import matplotlib.pyplot as plt
-from rest_framework.permissions import IsAuthenticated
-from django.views.decorators.cache import cache_page
-from django.utils.decorators import method_decorator
+from rest_framework.permissions import AllowAny
+from rest_framework.decorators import permission_classes
+import csv
+
 
 class AnalyticsViewSet(viewsets.ModelViewSet):
     """
     ViewSet for managing analytics data.
     """
-    queryset = Analytics.objects.all()
+    queryset = Analytics.objects.select_related('room').all()
     serializer_class = AnalyticsSerializer
+    permission_classes = [AllowAny]
 
     def get_queryset(self):
         """
-        Optionally filter analytics by room_id or date via query parameters.
+        Optionally filter analytics data by room_id, start_date, and end_date.
         """
+        queryset = self.queryset
         room_id = self.request.query_params.get('room_id')
-        date = self.request.query_params.get('date')
-        queryset = Analytics.objects.all()
+        start_date = self.request.query_params.get('start_date')
+        end_date = self.request.query_params.get('end_date')
+
         if room_id:
             queryset = queryset.filter(room_id=room_id)
-        if date:
-            queryset = queryset.filter(date=date)
+        if start_date and end_date:
+            queryset = queryset.filter(date__range=[start_date, end_date])
+        elif start_date:
+            queryset = queryset.filter(date__gte=start_date)
+        elif end_date:
+            queryset = queryset.filter(date__lte=end_date)
+
         return queryset
 
 
 class AnalyticsChartData(APIView):
-    permission_classes = [IsAuthenticated]
+    """
+    API endpoint to provide analytics data for frontend charts, including active users.
+    """
+    permission_classes = [AllowAny]
 
-    @method_decorator(cache_page(60 * 15))
     def get(self, request, *args, **kwargs):
         try:
-            past_week = now() - timedelta(days=7)
-            analytics_data = Analytics.objects.filter(last_updated__gte=past_week)
+            # Calculate active users based on active bookings
+            active_bookings = Booking.objects.filter(
+                start_time__lte=now(),  # Booking has started
+                end_time__gte=now(),  # Booking has not ended
+                status="checked_in"  # Booking is checked in
+            ).values("user").distinct()  # Get distinct users from active bookings
+
+            active_users_count = active_bookings.count()
+
+            # Fetch analytics data from the past 7 days
+            past_week = now().date() - timedelta(days=7)
+            analytics_data = Analytics.objects.filter(date__gte=past_week)
 
             if not analytics_data.exists():
                 return Response({
+                    "active_users": active_users_count,
                     "rooms": [],
                     "total_bookings": [],
                     "utilization_rates": []
                 })
 
-            data = {
-                "rooms": [analytics.room.name for analytics in analytics_data],
-                "total_bookings": [analytics.total_bookings for analytics in analytics_data],
-                "utilization_rates": [analytics.utilization_rate for analytics in analytics_data],
-            }
-            return Response(data)
-        except Exception as e:
-            return Response({"error": str(e)}, status=500)
+            # Aggregate data for response
+            room_data = {}
+            for analytics in analytics_data:
+                room_name = analytics.room.name
+                if room_name not in room_data:
+                    room_data[room_name] = {
+                        "total_bookings": analytics.total_bookings,
+                        "utilization_rate": [analytics.utilization_rate]
+                    }
+                else:
+                    room_data[room_name]["total_bookings"] += analytics.total_bookings
+                    room_data[room_name]["utilization_rate"].append(analytics.utilization_rate)
 
+            # Prepare response data
+            rooms = list(room_data.keys())
+            total_bookings = [data["total_bookings"] for data in room_data.values()]
+            utilization_rates = [
+                sum(data["utilization_rate"]) / len(data["utilization_rate"])
+                for data in room_data.values()
+            ]
+
+            data = {
+                "active_users": active_users_count,
+                "rooms": rooms,
+                "total_bookings": total_bookings,
+                "utilization_rates": utilization_rates,
+            }
+
+            return Response(data)
+
+        except Exception as e:
+            # Handle errors
+            print(f"Error in AnalyticsChartData: {e}")
+            return Response({"error": str(e)}, status=500)
 
 class ChartView(View):
     """
@@ -90,12 +136,13 @@ class ChartView(View):
         buffer.close()
         return response
 
+
 def weekly_utilization_heatmap(request):
     """
     Generate and return a heatmap for room utilization over the past week.
     """
-    past_week = now() - timedelta(days=7)
-    analytics_data = Analytics.objects.filter(last_updated__gte=past_week)
+    past_week = now().date() - timedelta(days=7)
+    analytics_data = Analytics.objects.filter(date__gte=past_week)
 
     rooms = [analytics.room.name for analytics in analytics_data]
     utilization_rates = [analytics.utilization_rate for analytics in analytics_data]
@@ -112,7 +159,8 @@ def weekly_utilization_heatmap(request):
     response = HttpResponse(buffer, content_type='image/png')
     buffer.close()
     return response
- 
+
+
 class Command(BaseCommand):
     help = "Generate room usage forecasts"
 
@@ -141,3 +189,46 @@ class Command(BaseCommand):
         plt.savefig("forecast.png")
         plt.show()
 
+class ExportCSVView(APIView):
+    """
+    API to export analytics data as a CSV file.
+    """
+    permission_classes = [AllowAny]  # Restrict this if needed for security
+
+    def get(self, request, *args, **kwargs):
+        # Create the HttpResponse object with the appropriate CSV header.
+        response = HttpResponse(content_type='text/csv')
+        response['Content-Disposition'] = 'attachment; filename="analytics_data.csv"'
+
+        # Create the CSV writer using the response as a file-like object
+        writer = csv.writer(response)
+
+        # Write header row
+        writer.writerow([
+            'Room Name',
+            'Date',
+            'Total Bookings',
+            'Total Check-ins',
+            'Total Cancellations',
+            'Total Usage Time (hours)',
+            'Utilization Rate (%)',
+            'Peak Hours'
+        ])
+
+        # Query analytics data
+        analytics_data = Analytics.objects.select_related('room').all()
+
+        # Write data rows
+        for analytics in analytics_data:
+            writer.writerow([
+                analytics.room.name,
+                analytics.date,
+                analytics.total_bookings,
+                analytics.total_checkins,
+                analytics.total_cancellations,
+                analytics.total_usage_time,
+                analytics.utilization_rate,
+                analytics.peak_hours
+            ])
+
+        return response

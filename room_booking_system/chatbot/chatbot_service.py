@@ -22,6 +22,15 @@ def get_intent_from_witai(user_input):
     except requests.exceptions.RequestException as e:
         raise Exception(f"Wit.ai API error: {e}")
 
+# Normalize room names for better matching
+def normalize_room_name(name):
+    return " ".join(name.strip().lower().split())
+
+# Search for room by name with partial match support
+def find_room_by_name(room_name):
+    normalized_name = normalize_room_name(room_name)
+    return Room.objects.filter(name__icontains=normalized_name).first()
+
 # Chatbot response logic
 def get_chatbot_response(user_input, logged_in_user):
     try:
@@ -39,14 +48,17 @@ def get_chatbot_response(user_input, logged_in_user):
         if intent == "greeting":
             return JsonResponse({"response": f"Hello {user_name}! How can I assist you today?"})
 
+        
         # Book Room Intent
-        elif intent == "book_room":
-            rooms = Room.objects.filter(is_available=True)
-            if rooms.exists():
-                room_list = ", ".join([room.name for room in rooms])
-                return JsonResponse({"response": f"{user_name}, the following rooms are available for booking: {room_list}."})
-            else:
-                return JsonResponse({"response": f"No rooms are available for booking, {user_name}."})
+        elif intent in ["book_room", "check_room_availability"]:
+            synonyms = ["free", "empty", "available"]
+            if any(word in user_input.lower() for word in synonyms):
+                rooms = Room.objects.filter(is_available=True)
+                if rooms.exists():
+                    room_list = ", ".join([room.name for room in rooms])
+                    return JsonResponse({"response": f"{user_name}, the following rooms are free and available for booking: {room_list}."})
+                else:
+                    return JsonResponse({"response": f"No rooms are currently free, {user_name}."})
 
         # Cancel Booking Intent
         elif intent == "cancel_booking":
@@ -66,30 +78,85 @@ def get_chatbot_response(user_input, logged_in_user):
         elif intent == "search_room":
             # Extract criteria from Wit.ai entities
             entities = wit_data.get("entities", {})
-            capacity = entities.get("capacity:capacity", [{}])[0].get("value")  # Extract capacity
-            location = entities.get("location:location", [{}])[0].get("value")  # Extract location
+            capacity = entities.get("capacity:capacity", [{}])[0].get("value")  # Extract capacity if provided
+            location = entities.get("location:location", [{}])[0].get("value")  # Extract location if provided
+            synonyms = ["free", "available", "empty"]  # Add common synonyms for free rooms
 
+            # Initialize filters dictionary
             filters = {}
-            # Add capacity filter if available
+
+            # Add capacity filter if capacity is specified
             if capacity:
                 try:
-                    capacity = int(capacity)  # Convert to integer
-                    filters["capacity__gte"] = capacity  # Add filter for "at least capacity"
+                    capacity = int(capacity)  # Ensure capacity is an integer
+                    filters["capacity__gte"] = capacity  # Filter for rooms with at least the given capacity
                 except ValueError:
                     return JsonResponse({"response": "Invalid capacity value. Please provide a valid number."})
 
-            # Add location filter if available
+            # Add location filter if location is specified
             if location:
-                filters["location__icontains"] = location  # Add filter for location
+                filters["location__icontains"] = location  # Perform a case-insensitive search for location
 
-            # Apply filters
-            matching_rooms = Room.objects.filter(**filters, is_available=True)
+            # Handle synonyms for free or available rooms
+            if any(word in user_input.lower() for word in synonyms):
+                filters["is_available"] = True  # Filter for rooms that are currently available
 
+            # Query the Room model with the constructed filters
+            matching_rooms = Room.objects.filter(**filters)
+
+            # If matching rooms exist, construct the response
             if matching_rooms.exists():
                 room_list = ", ".join([f"{room.name} ({room.location})" for room in matching_rooms])
                 return JsonResponse({"response": f"The following rooms match your criteria: {room_list}."})
             else:
+                # If no rooms match, return a no-match response
                 return JsonResponse({"response": "No rooms match your criteria. Please try different filters."})
+                            
+        # Identify Room Intent
+        elif intent == "identify_room":
+            entities = wit_data.get("entities", {})
+            room_name = entities.get("room_name:room_name", [{}])[0].get("value")
+
+            if not room_name:
+                return JsonResponse({"response": "Please specify the room name you want to inquire about."})
+
+            room = find_room_by_name(room_name)
+
+            if room:
+                return JsonResponse({"response": f"Yes, {room.name} exists and is located on the {room.location}."})
+            else:
+                available_rooms = ", ".join(Room.objects.values_list("name", flat=True))
+                return JsonResponse({"response": f"No, I couldn't find a room named '{room_name}'. Available rooms are: {available_rooms}"})
+
+        # Check Room Occupancy Intent
+        elif intent == "check_room_occupancy":
+            entities = wit_data.get("entities", {})
+            room_name = entities.get("room_name:room_name", [{}])[0].get("value")
+
+            if not room_name:
+                return JsonResponse({"response": "Please specify the room name to check its occupancy."})
+
+            room = find_room_by_name(room_name)
+
+            if room:
+                if room.is_available:
+                    return JsonResponse({"response": f"The {room.name} is currently free and available for booking."})
+                else:
+                    return JsonResponse({"response": f"The {room.name} is currently occupied."})
+            else:
+                available_rooms = ", ".join(Room.objects.values_list("name", flat=True))
+                return JsonResponse({"response": f"I couldn't find a room named '{room_name}'. Available rooms are: {available_rooms}"})
+
+        # List Available Rooms
+        elif intent in ["book_room", "check_room_availability"]:
+            synonyms = ["free", "empty", "available"]
+            if any(word in user_input.lower() for word in synonyms):
+                rooms = Room.objects.filter(is_available=True)
+                if rooms.exists():
+                    room_list = ", ".join([room.name for room in rooms])
+                    return JsonResponse({"response": f"{user_name}, the following rooms are free and available for booking: {room_list}."})
+                else:
+                    return JsonResponse({"response": f"No rooms are currently free, {user_name}."})
 
         # Unknown Intent
         elif intent == "unknown":

@@ -163,4 +163,3 @@ def update_total_cancellations(sender, instance, **kwargs):
         analytics, _ = Analytics.objects.get_or_create(room=instance.room, date=instance.start_time.date())
         analytics.total_cancellations += 1
         analytics.save()
-

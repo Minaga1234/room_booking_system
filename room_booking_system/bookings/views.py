@@ -10,10 +10,13 @@ from datetime import date
 from django.utils import timezone
 from notifications.models import Notification
 from rest_framework.exceptions import ValidationError
+from rest_framework.decorators import api_view
+from django.db.models import Count
 
 class BookingViewSet(viewsets.ModelViewSet):
     queryset = Booking.objects.all()
     serializer_class = BookingSerializer
+
 
     @action(detail=False, methods=['get'])
     def my_bookings(self, request):
@@ -44,7 +47,7 @@ class BookingViewSet(viewsets.ModelViewSet):
             notification_type='booking_update'
         )
         return Response({"message": "Booking approved."})
-
+    
     @action(detail=True, methods=['post'], permission_classes=[IsAdminUser])
     def cancel(self, request, pk=None):
         """
@@ -169,3 +172,20 @@ class BookingViewSet(viewsets.ModelViewSet):
         if analytics and analytics.utilization_rate > 80:  # Threshold for peak usage
             raise ValidationError("Room is currently in high demand. Booking restrictions apply.")
         
+    @action(detail=False, methods=['get'])
+    def popular_rooms(self, request):
+        """
+        Get the most popular rooms based on booking counts.
+        """
+        popular_rooms = Booking.objects.values('room__name').annotate(
+            booking_count=Count('id')
+        ).order_by('-booking_count')
+        return Response(popular_rooms)
+
+    @action(detail=False, methods=['get'])
+    def traffic_data(self, request):
+        """
+        Get traffic data based on bookings and check-ins.
+        """
+        analytics = Analytics.objects.all().values('room__name', 'date', 'total_bookings', 'total_checkins')
+        return Response(analytics)
