@@ -15,9 +15,6 @@ class NotificationInline(admin.TabularInline):
 class BookingAdmin(admin.ModelAdmin):
     list_display = ('room', 'user', 'degree_major', 'purpose', 'start_time', 'end_time', 'status', 'is_approved')
     list_filter = ('status', 'is_approved', 'created_at')
-<<<<<<< HEAD
-    search_fields = ('user__username', 'room__name', 'degree_major__name', 'purpose')
-=======
     search_fields = ('user__username', 'room__name')
     inlines = [NotificationInline]  # Include related notifications inline
 
@@ -32,4 +29,3 @@ class BookingAdmin(admin.ModelAdmin):
         queryset.update(status='canceled', is_approved=False)
         self.message_user(request, "Selected bookings have been canceled.")
     cancel_bookings.short_description = "Cancel selected bookings"
->>>>>>> 95be7a5d30d503825ae028e43040e0af7f1c5109

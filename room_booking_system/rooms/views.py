@@ -5,15 +5,18 @@ from rest_framework.decorators import action
 from .models import Room, UsageLog
 from .serializers import RoomSerializer, UsageLogSerializer
 from .permissions import IsAdminOrReadOnly  # Custom permission
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, IsAuthenticatedOrReadOnly
 from users.permissions import IsAdminOrStaff, IsAdmin
 
 class RoomViewSet(viewsets.ModelViewSet):
     queryset = Room.objects.all()
     serializer_class = RoomSerializer
-    permission_classes = [IsAuthenticated, IsAdminOrReadOnly]  # Admins can modify; others can only view
+    permission_classes = [IsAuthenticatedOrReadOnly]  # Read-only access for unauthenticated users
 
     def get_queryset(self):
+        """
+        Override the default queryset to apply filters dynamically.
+        """
         queryset = super().get_queryset()
         # Filter out soft-deleted rooms
         queryset = queryset.filter(is_deleted=False)
@@ -36,7 +39,11 @@ class RoomViewSet(viewsets.ModelViewSet):
         # Filter by minimum capacity
         capacity = self.request.query_params.get('capacity')
         if capacity:
-            queryset = queryset.filter(capacity__gte=int(capacity))
+            try:
+                capacity = int(capacity)
+                queryset = queryset.filter(capacity__gte=capacity)
+            except ValueError:
+                pass  # Ignore invalid capacity values
 
         return queryset
 
@@ -77,7 +84,7 @@ class RoomViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['post'], permission_classes=[IsAdmin])
     def approve_room(self, request, pk=None):
         """
-        Example action where only admins can approve rooms.
+        Approve a room. Only admins can perform this action.
         """
         room = self.get_object()
         room.requires_approval = False

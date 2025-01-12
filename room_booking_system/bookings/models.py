@@ -174,3 +174,17 @@ class Booking(models.Model):
         if self.status == 'approved' and not self.checked_in and self.start_time < timezone.now():
             return 100.00  # Example: No-show penalty
         return 0.00
+    
+    def destroy(self, request, *args, **kwargs):
+        booking = self.get_object()
+        # Check and apply penalties
+        self.check_for_penalty(booking)
+        # Notify user
+        Notification.objects.create(
+            user=booking.user,
+            message=f"Your booking for {booking.room.name} has been canceled.",
+            notification_type='booking_update'
+        )
+        return super().destroy(request, *args, **kwargs)
+
+    

@@ -3,14 +3,12 @@ from rest_framework.routers import DefaultRouter
 from .views import BookingViewSet
 
 router = DefaultRouter()
-router.register(r'', BookingViewSet, basename="booking")  # Removed the 'bookings' prefix
+router.register(r'', BookingViewSet, basename="booking")
 
-<<<<<<< HEAD
 urlpatterns = [
     path('', include(router.urls)),
     path('popular_rooms/', BookingViewSet.as_view({'get': 'popular_rooms'}), name='popular_rooms'),
     path('traffic_data/', BookingViewSet.as_view({'get': 'traffic_data'}), name='traffic_data'),
+    path('calendar_events/', BookingViewSet.as_view({'get': 'calendar_events'}), name='calendar_events'),
+    path('my_bookings/', BookingViewSet.as_view({'get': 'my_bookings'}), name='my_bookings'),  # Added my_bookings
 ]
-=======
-urlpatterns = router.urls  # Directly use router.urls without additional prefixes
->>>>>>> 95be7a5d30d503825ae028e43040e0af7f1c5109

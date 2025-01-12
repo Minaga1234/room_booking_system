@@ -53,11 +53,11 @@ INSTALLED_APPS = [
     # Third-party apps
     'rest_framework',
     'rest_framework.authtoken',
-    'corsheaders',
+    'corsheaders',  # Added here
 ]
 
 MIDDLEWARE = [
-    'corsheaders.middleware.CorsMiddleware',
+    'corsheaders.middleware.CorsMiddleware',  # Ensure this is first for CORS
     'django.middleware.common.CommonMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
@@ -86,13 +86,14 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = 'room_booking_system.wsgi.application'
+
 # Database Configuration
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.mysql',
         'NAME': 'room_booking_system',
         'USER': 'root',
-        'PASSWORD': 'mysql',
+        'PASSWORD': 'Cponline@99',
         'HOST': '127.0.0.1',
         'PORT': '3306',
     }
@@ -118,7 +119,7 @@ AUTH_PASSWORD_VALIDATORS = [
 
 # Internationalization
 LANGUAGE_CODE = 'en-us'
-TIME_ZONE = 'UTC'
+TIME_ZONE = 'Asia/Colombo'
 USE_I18N = True
 USE_L10N = True
 USE_TZ = True
@@ -129,7 +130,6 @@ STATICFILES_DIRS = [os.path.join(BASE_DIR, 'static')]
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
 MEDIA_URL = '/media/'
-
 
 # Logging Configuration
 LOGGING = {
@@ -150,8 +150,6 @@ LOGGING = {
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
         'rest_framework_simplejwt.authentication.JWTAuthentication',
-        'rest_framework.authentication.TokenAuthentication',
-        'rest_framework.authentication.SessionAuthentication',
     ],
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.AllowAny',
@@ -174,33 +172,21 @@ CELERY_BROKER_URL = 'redis://localhost:6379/0'
 CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 
-
-
 # Default Primary Key Field Type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-
-AUTH_USER_MODEL = 'users.CustomUser'
-
 # CORS settings
-# Add your frontend origin to CORS_ALLOWED_ORIGINS and CSRF_TRUSTED_ORIGINS
 CORS_ALLOWED_ORIGINS = [
     "http://127.0.0.1:5500",  # Frontend origin
     "http://localhost:5500",  # Alternate localhost origin
 ]
-
 
 CSRF_TRUSTED_ORIGINS = [
     "http://127.0.0.1:5500",
     "http://localhost:5500",
 ]
 
+CORS_ALLOW_CREDENTIALS = True  # Allow cookies or other credentials
 
-CORS_ALLOW_ALL_ORIGINS = True
-CSRF_COOKIE_SECURE = False  # True for production with HTTPS
-CSRF_COOKIE_HTTPONLY = False  # True for production with HTTPS
-
-
-
-# Use this for development only (not recommended for production)
-# CORS_ALLOW_ALL_ORIGINS = True
+# Remove CORS_ALLOW_ALL_ORIGINS to ensure strict control
+# CSRF_COOKIE_SECURE is False for development but must be True in production with HTTPS

@@ -34,15 +34,10 @@ class UserViewSet(viewsets.ModelViewSet):
         """
         Assign permissions based on action.
         """
-<<<<<<< HEAD
-        if self.action in ['register_user', 'login']:
-            return [permissions.AllowAny()]
-=======
         if self.action in ['create']:
             return [IsAdmin()]  # Restrict user creation to admins only
         elif self.action in ['login']:
             return [permissions.AllowAny()]  # Allow anyone to log in
->>>>>>> 95be7a5d30d503825ae028e43040e0af7f1c5109
         elif self.action in ['list', 'destroy']:
             return [IsAdmin()]
         elif self.action in ['update', 'partial_update', 'deactivate']:
@@ -51,37 +46,63 @@ class UserViewSet(viewsets.ModelViewSet):
             return [permissions.IsAuthenticated()]
         return super().get_permissions()
 
-    @action(detail=False, methods=['GET','POST'], permission_classes=[permissions.AllowAny])
+    @action(detail=False, methods=['POST'], permission_classes=[permissions.AllowAny])
     def register_user(self, request):
-        if request.method == "GET":
-            return Response({"info": "Use POST to register a new user."}, status=status.HTTP_200_OK)
-        elif request.method == "POST":
-            serializer = self.get_serializer(data=request.data)
-            serializer.is_valid(raise_exception=True)
+        try:
+            data = request.data
+            print("Incoming data:", data)  # Debug incoming data
+
+            role = data.get("role", "student").lower()
+            if role == "lecturer":
+                role = "staff"
+            if role not in ["student", "staff"]:
+                return Response({"error": "Invalid role. Must be 'student' or 'lecturer'."},
+                                status=status.HTTP_400_BAD_REQUEST)
+
+            if not data.get("username"):
+                return Response({"error": "Username is required."}, status=status.HTTP_400_BAD_REQUEST)
+            if not data.get("email"):
+                return Response({"error": "Email is required."}, status=status.HTTP_400_BAD_REQUEST)
+            if not data.get("password"):
+                return Response({"error": "Password is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+            # Check for duplicates
+            if CustomUser.objects.filter(email=data["email"]).exists():
+                return Response({"error": "This email is already registered."}, status=status.HTTP_400_BAD_REQUEST)
+            if CustomUser.objects.filter(username=data["username"]).exists():
+                return Response({"error": "This username is already taken."}, status=status.HTTP_400_BAD_REQUEST)
+
+            serializer = self.get_serializer(data={
+                "username": data["username"],
+                "email": data["email"],
+                "password": data["password"],
+                "role": role,
+            })
+
+            if not serializer.is_valid():
+                print("Validation errors:", serializer.errors)  # Debug validation errors
+                return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
             serializer.save()
             return Response({"message": "User registered successfully!"}, status=status.HTTP_201_CREATED)
 
+        except Exception as e:
+            print("Unexpected error:", str(e))  # Debug unexpected exceptions
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
     @action(detail=False, methods=['post'], permission_classes=[permissions.AllowAny])
     def login(self, request):
-<<<<<<< HEAD
         """
         User login with email and password.
         """
-=======
->>>>>>> 95be7a5d30d503825ae028e43040e0af7f1c5109
         email = request.data.get('email')
         password = request.data.get('password')
         try:
             user = CustomUser.objects.get(email=email)
-<<<<<<< HEAD
         except CustomUser.DoesNotExist:
             return Response({"error": "Invalid email or password"}, status=status.HTTP_401_UNAUTHORIZED)
 
         if user.check_password(password):
-=======
-            if not user.check_password(password):
-                return Response({"error": "Invalid credentials"}, status=401)
->>>>>>> 95be7a5d30d503825ae028e43040e0af7f1c5109
             if not user.is_active:
                 return Response({"error": "Account is inactive"}, status=status.HTTP_403_FORBIDDEN)
 
@@ -91,12 +112,7 @@ class UserViewSet(viewsets.ModelViewSet):
                 "access": str(refresh.access_token),
                 "role": user.role,
             })
-<<<<<<< HEAD
         return Response({"error": "Invalid email or password"}, status=status.HTTP_401_UNAUTHORIZED)
-=======
-        except CustomUser.DoesNotExist:
-            return Response({"error": "User with this email does not exist."}, status=401)
->>>>>>> 95be7a5d30d503825ae028e43040e0af7f1c5109
 
     @action(detail=False, methods=['get'], permission_classes=[permissions.IsAuthenticated])
     def profile(self, request):
@@ -134,11 +150,7 @@ class UserViewSet(viewsets.ModelViewSet):
 
     def list(self, request, *args, **kwargs):
         """
-<<<<<<< HEAD
-        Disable listing all users.
-=======
         Disable the list view for all users.
->>>>>>> 95be7a5d30d503825ae028e43040e0af7f1c5109
         """
         return Response({"detail": "Not allowed."}, status=status.HTTP_405_METHOD_NOT_ALLOWED)
 

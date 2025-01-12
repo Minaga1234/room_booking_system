@@ -13,22 +13,29 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.decorators import api_view
 from django.db.models import Count
 from penalties.views import PenaltyViewSet
+from rest_framework.permissions import IsAuthenticated
 
 class BookingViewSet(viewsets.ModelViewSet):
     queryset = Booking.objects.all()
     serializer_class = BookingSerializer
 
 
-    @action(detail=False, methods=['get'])
+    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
     def my_bookings(self, request):
         """
         Fetch bookings for the currently logged-in user.
         """
         user = request.user
+
+        # Ensure the user is authenticated
+        if not user.is_authenticated:
+            return Response({"error": "Authentication required"}, status=401)
+
+        # Fetch user-specific bookings
         user_bookings = Booking.objects.filter(user=user)
         serializer = self.get_serializer(user_bookings, many=True)
         return Response(serializer.data)
-
+    
     @action(detail=True, methods=['post'], permission_classes=[IsAdminUser])
     def approve(self, request, pk=None):
         """
@@ -207,3 +214,18 @@ class BookingViewSet(viewsets.ModelViewSet):
                 message=f"A penalty of ${penalty.amount} has been imposed for {penalty.reason}.",
                 notification_type='penalty_reminder'
             )
+            
+    @action(detail=False, methods=['get'])
+    def calendar_events(self, request):
+        bookings = Booking.objects.all()
+        events = [
+            {
+                "id": booking.id,
+                "title": f"{booking.room.name} - {booking.user.username}",
+                "start": booking.start_time.isoformat(),
+                "end": booking.end_time.isoformat()
+            }
+            for booking in bookings
+        ]
+        return Response(events)
+

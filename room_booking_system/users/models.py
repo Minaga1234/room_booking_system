@@ -2,7 +2,6 @@ from django.contrib.auth.models import AbstractUser, BaseUserManager
 from django.core.validators import RegexValidator
 from django.db import models
 
-
 class CustomUserManager(BaseUserManager):
     """
     Custom manager for CustomUser.
@@ -10,22 +9,17 @@ class CustomUserManager(BaseUserManager):
 
     def create_user(self, username, email, password=None, **extra_fields):
         if not email:
-<<<<<<< HEAD
             raise ValueError("The Email field must be set.")
-=======
-            raise ValueError('The Email field must be set.')
-        if CustomUser.objects.filter(username=username).exists():
-            raise ValueError('A user with this username already exists.')
-        if CustomUser.objects.filter(email=email).exists():
-            raise ValueError('A user with this email already exists.')
->>>>>>> 95be7a5d30d503825ae028e43040e0af7f1c5109
+        if not username:
+            raise ValueError("The Username field must be set.")
         email = self.normalize_email(email)
         extra_fields.setdefault("is_active", True)
+        extra_fields.setdefault("is_staff", False)  # Default staff status
+        extra_fields.setdefault("is_superuser", False)  # Default superuser status
         user = self.model(username=username, email=email, **extra_fields)
         user.set_password(password)
         user.save(using=self._db)
         return user
-
 
     def create_superuser(self, username, email, password=None, **extra_fields):
         extra_fields.setdefault("is_staff", True)
@@ -39,38 +33,33 @@ class CustomUserManager(BaseUserManager):
 class CustomUser(AbstractUser):
     ROLE_CHOICES = [
         ("admin", "Admin"),
-        ("staff", "Staff"),
+        ("staff", "Lecturer"),  # Maps to "lecturer" in the frontend
         ("student", "Student"),
     ]
-<<<<<<< HEAD
+
+    # Removed unnecessary fields
+    first_name = None
+    last_name = None
+    phone_number = None
 
     role = models.CharField(max_length=20, choices=ROLE_CHOICES, default="student")
-    phone_number = models.CharField(
-        max_length=15,
-        blank=True,
-        null=True,
-        validators=[
-            RegexValidator(
-                regex=r"^\+?1?\d{10,15}$",
-                message="Phone number must be entered in the format: '+999999999'. Up to 15 digits allowed.",
-            )
-        ],
-    )
     is_active = models.BooleanField(default=True)
-=======
-    email = models.EmailField(unique=True)  # Ensure email is unique
-    username = models.CharField(max_length=150, unique=True, blank=True, null=True)  # Optional username
-    role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='student')
-    phone_number = models.CharField(max_length=15, blank=True, null=True)
->>>>>>> 95be7a5d30d503825ae028e43040e0af7f1c5109
 
-    USERNAME_FIELD = 'email'  # Use email as the primary identifier
-    REQUIRED_FIELDS = ['username']  # Add username as a required field if needed
+    # Resolve conflicts with related_name
+    groups = models.ManyToManyField(
+        "auth.Group",
+        related_name="customuser_groups",
+        blank=True,
+    )
+    user_permissions = models.ManyToManyField(
+        "auth.Permission",
+        related_name="customuser_permissions",
+        blank=True,
+    )
 
-    objects = CustomUserManager()
+    objects = CustomUserManager()  # Use the custom manager
 
     def __str__(self):
-<<<<<<< HEAD
         return self.username
 
     class Meta:
@@ -79,7 +68,6 @@ class CustomUser(AbstractUser):
         constraints = [
             models.UniqueConstraint(fields=["email"], name="unique_email_constraint"),
         ]
-
 
 class UserProfile(models.Model):
     """
@@ -97,6 +85,3 @@ class UserProfile(models.Model):
     class Meta:
         verbose_name = "User Profile"
         verbose_name_plural = "User Profiles"
-=======
-        return self.email  # Return email for representation
->>>>>>> 95be7a5d30d503825ae028e43040e0af7f1c5109

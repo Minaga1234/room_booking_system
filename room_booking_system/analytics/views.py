@@ -30,41 +30,24 @@ class AnalyticsViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         """
-<<<<<<< HEAD
         Optionally filter analytics data by room_id, start_date, and end_date.
         """
         queryset = self.queryset
         room_id = self.request.query_params.get('room_id')
-=======
-        Optionally filter analytics by room_id, date, or date range (start_date and end_date) via query parameters.
-        """
-        queryset = Analytics.objects.all()
-        room_id = self.request.query_params.get('room_id')
-        date = self.request.query_params.get('date')
->>>>>>> 95be7a5d30d503825ae028e43040e0af7f1c5109
         start_date = self.request.query_params.get('start_date')
         end_date = self.request.query_params.get('end_date')
 
         if room_id:
             queryset = queryset.filter(room_id=room_id)
-<<<<<<< HEAD
-=======
-        if date:
-            queryset = queryset.filter(date=date)
->>>>>>> 95be7a5d30d503825ae028e43040e0af7f1c5109
         if start_date and end_date:
             queryset = queryset.filter(date__range=[start_date, end_date])
         elif start_date:
             queryset = queryset.filter(date__gte=start_date)
         elif end_date:
             queryset = queryset.filter(date__lte=end_date)
-<<<<<<< HEAD
 
         return queryset
-=======
->>>>>>> 95be7a5d30d503825ae028e43040e0af7f1c5109
 
-        return queryset
 
 class AnalyticsChartData(APIView):
     """
