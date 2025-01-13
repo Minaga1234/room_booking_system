@@ -48,6 +48,10 @@ class CustomUser(AbstractUser):
     )
     is_active = models.BooleanField(default=True)
 
+    # Explicitly remove `first_name` and `last_name` fields
+    first_name = None
+    last_name = None
+
     objects = CustomUserManager()  # Use the custom manager
 
     def __str__(self):

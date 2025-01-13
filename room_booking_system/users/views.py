@@ -44,15 +44,45 @@ class UserViewSet(viewsets.ModelViewSet):
             return [permissions.IsAuthenticated()]
         return super().get_permissions()
 
-    @action(detail=False, methods=['GET','POST'], permission_classes=[permissions.AllowAny])
+    @action(detail=False, methods=['POST'], permission_classes=[permissions.AllowAny])
     def register_user(self, request):
-        if request.method == "GET":
-            return Response({"info": "Use POST to register a new user."}, status=status.HTTP_200_OK)
-        elif request.method == "POST":
-            serializer = self.get_serializer(data=request.data)
-            serializer.is_valid(raise_exception=True)
-            serializer.save()
-            return Response({"message": "User registered successfully!"}, status=status.HTTP_201_CREATED)
+        """
+        Handles user registration. Accepts username, email, password, and role.
+        """
+        data = request.data
+        role = data.get("role", "student").lower()
+
+        # Map "lecturer" to "staff"
+        if role == "lecturer":
+            role = "staff"
+
+        # Validate role
+        if role not in ["student", "staff", "admin"]:
+            return Response({"error": f'"{data.get("role")}" is not a valid choice.'},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        # Validate required fields
+        if not data.get("username"):
+            return Response({"error": "Username is required."}, status=status.HTTP_400_BAD_REQUEST)
+        if not data.get("email"):
+            return Response({"error": "Email is required."}, status=status.HTTP_400_BAD_REQUEST)
+        if not data.get("password"):
+            return Response({"error": "Password is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Ensure email is unique
+        if CustomUser.objects.filter(email=data["email"]).exists():
+            return Response({"error": "Email is already registered."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Ensure username is valid and unique
+        if not data["username"].isalnum():
+            return Response({"error": "Username can only contain letters and numbers."},
+                            status=status.HTTP_400_BAD_REQUEST)
+
+        serializer = self.get_serializer(data={**data, "role": role})
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+
+        return Response({"message": "User registered successfully!"}, status=status.HTTP_201_CREATED)
 
     @action(detail=False, methods=['post'], permission_classes=[permissions.AllowAny])
     def login(self, request):
