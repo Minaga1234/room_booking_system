@@ -4,7 +4,7 @@ from django.core.exceptions import ValidationError
 from django.core.exceptions import ValidationError
 from rooms.models import Room
 from analytics.models import Analytics
-
+from branding.models import Degree
 
 class Booking(models.Model):
     STATUS_CHOICES = (
@@ -16,17 +16,19 @@ class Booking(models.Model):
 
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="bookings")
     room = models.ForeignKey(Room, on_delete=models.CASCADE, related_name="bookings")
+    degree_major = models.ForeignKey(Degree, on_delete=models.SET_NULL, null=True, blank=True, help_text="Degree associated with the booking.")  # New Field
+    purpose = models.TextField(help_text="Detailed purpose for the booking.")  # New Field
     start_time = models.DateTimeField()
     end_time = models.DateTimeField()
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
     is_approved = models.BooleanField(default=False)
     penalty_flag = models.BooleanField(default=False)
     checked_in = models.BooleanField(default=False)
-    price = models.FloatField(default=100.0)  # New field for dynamic pricing
+    price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
-    
+
     class Meta:
         ordering = ['start_time']
         constraints = [
@@ -38,7 +40,7 @@ class Booking(models.Model):
 
     def __str__(self):
         return f"Booking: {self.room.name} by {self.user.username} ({self.status})"
-
+    
     def clean(self):
         """
         Validate booking to prevent overlapping times and apply rules.

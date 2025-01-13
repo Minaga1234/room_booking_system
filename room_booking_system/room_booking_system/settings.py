@@ -11,7 +11,7 @@ https://docs.djangoproject.com/en/5.1/ref/settings/
 """
 import pymysql
 pymysql.install_as_MySQLdb()
-
+import os
 from pathlib import Path
 from datetime import timedelta
 
@@ -50,7 +50,6 @@ INSTALLED_APPS = [
     'analytics',
     'branding',
 
-
     # Third-party apps
     'rest_framework',
     'rest_framework.authtoken',
@@ -58,11 +57,10 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
-    'corsheaders.middleware.CorsMiddleware',  # Added cors middleware
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
-    'corsheaders.middleware.CorsMiddleware',  # CORS Middleware
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
@@ -127,6 +125,8 @@ USE_TZ = True
 
 # Static files (CSS, JavaScript, Images)
 STATIC_URL = '/static/'
+STATICFILES_DIRS = [os.path.join(BASE_DIR, 'static')]
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
 
 # Logging Configuration
@@ -152,7 +152,7 @@ REST_FRAMEWORK = {
         'rest_framework.authentication.SessionAuthentication',
     ],
     'DEFAULT_PERMISSION_CLASSES': [
-        'rest_framework.permissions.IsAuthenticated',
+        'rest_framework.permissions.AllowAny',
     ],
 }
 
@@ -172,11 +172,7 @@ CELERY_BROKER_URL = 'redis://localhost:6379/0'
 CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 
-# CORS Configuration
-CORS_ALLOWED_ORIGINS = [
-    "http://127.0.0.1:5500",
-    "http://localhost:5500",
-]
+
 
 # Default Primary Key Field Type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
@@ -185,10 +181,24 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 AUTH_USER_MODEL = 'users.CustomUser'
 
 # CORS settings
+# Add your frontend origin to CORS_ALLOWED_ORIGINS and CSRF_TRUSTED_ORIGINS
 CORS_ALLOWED_ORIGINS = [
-    "http://127.0.0.1:5500",  # Replace with your frontend's address
+    "http://127.0.0.1:5500",  # Frontend origin
+    "http://localhost:5500",  # Alternate localhost origin
+]
+
+
+CSRF_TRUSTED_ORIGINS = [
+    "http://127.0.0.1:5500",
     "http://localhost:5500",
 ]
+
+
+CORS_ALLOW_ALL_ORIGINS = True
+CSRF_COOKIE_SECURE = False  # True for production with HTTPS
+CSRF_COOKIE_HTTPONLY = False  # True for production with HTTPS
+
+
 
 # Use this for development only (not recommended for production)
 # CORS_ALLOW_ALL_ORIGINS = True
