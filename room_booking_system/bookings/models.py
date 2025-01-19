@@ -15,10 +15,14 @@ class Booking(models.Model):
         ('canceled', 'Canceled'),
     )
 
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="bookings")
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="bookings"
+    )
     room = models.ForeignKey(Room, on_delete=models.CASCADE, related_name="bookings")
-    degree_major = models.ForeignKey(Degree, on_delete=models.SET_NULL, null=True, blank=True, help_text="Degree associated with the booking.")  # New Field
-    purpose = models.TextField(help_text="Detailed purpose for the booking.")  # New Field
+    degree_major = models.ForeignKey(Degree, on_delete=models.SET_NULL, null=True, blank=True)
+    purpose = models.TextField()
     start_time = models.DateTimeField()
     end_time = models.DateTimeField()
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
@@ -28,10 +32,8 @@ class Booking(models.Model):
     price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
 
     class Meta:
-        ordering = ['start_time']
         constraints = [
             models.UniqueConstraint(
                 fields=['room', 'start_time', 'end_time'],

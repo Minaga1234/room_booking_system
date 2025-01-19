@@ -4,7 +4,7 @@ from django.conf import settings
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from django.views.generic import TemplateView
-from rest_framework.permissions import IsAdminUser, IsAuthenticated
+from rest_framework.permissions import IsAdminUser, IsAuthenticated, AllowAny
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework.exceptions import PermissionDenied
 from .models import Branding, Degree, Theme
@@ -90,10 +90,28 @@ class BrandingAssetsAPI(APIView):
 
 
 class DegreeView(APIView):
-    permission_classes = [IsAuthenticated, IsAdminUser]
+    """
+    API View for managing degrees.
+    - GET: Publicly accessible.
+    - POST: Admin-only.
+    - DELETE: Admin-only.
+    """
     authentication_classes = [JWTAuthentication]
 
+    def get_permissions(self):
+        """
+        Assign permissions based on the HTTP method.
+        - GET: Public access (AllowAny).
+        - POST/DELETE: Admin-only (IsAdminUser).
+        """
+        if self.request.method == "GET":
+            return [AllowAny()]
+        return [IsAdminUser()]
+
     def get(self, request):
+        """
+        Retrieve all degrees. Publicly accessible.
+        """
         try:
             degrees = Degree.objects.all()
             serializer = DegreeSerializer(degrees, many=True)
@@ -102,8 +120,10 @@ class DegreeView(APIView):
             logger.error(f"Error fetching degrees: {e}")
             return Response({"detail": "Internal server error while fetching degrees."}, status=500)
 
-
     def post(self, request):
+        """
+        Create a new degree. Restricted to admins.
+        """
         serializer = DegreeSerializer(data=request.data)
         if serializer.is_valid():
             serializer.save()
@@ -111,7 +131,10 @@ class DegreeView(APIView):
             return Response(serializer.data, status=201)
         return Response(serializer.errors, status=400)
 
-    def delete(self, request, pk=None):
+    def delete(self, request):
+        """
+        Delete a degree. Restricted to admins.
+        """
         degree_id = request.data.get("id")
         if not degree_id:
             return Response({"detail": "Degree ID is required."}, status=400)
@@ -120,13 +143,15 @@ class DegreeView(APIView):
             degree = Degree.objects.get(pk=degree_id)
             # Check for dependencies
             if Branding.objects.filter(degrees=degree).exists():
-                return Response({"detail": f"Cannot delete degree '{degree.name}' as it is linked to a branding."}, status=400)
+                return Response(
+                    {"detail": f"Cannot delete degree '{degree.name}' as it is linked to a branding."},
+                    status=400,
+                )
             degree.delete()
             logger.info(f"Degree '{degree.name}' deleted by {request.user.username}.")
             return Response({"message": "Degree deleted successfully."}, status=204)
         except Degree.DoesNotExist:
             return Response({"detail": "Degree not found."}, status=404)
-
 
 class ThemeListCreateAPIView(APIView):
     permission_classes = [IsAuthenticated, IsAdminUser]

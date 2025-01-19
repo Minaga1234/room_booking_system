@@ -49,6 +49,7 @@ INSTALLED_APPS = [
     'chatbot',
     'analytics',
     'branding',
+    'feedback',
 
     # Third-party apps
     'rest_framework',
@@ -100,6 +101,7 @@ DATABASES = {
 }
 
 AUTH_USER_MODEL = 'users.CustomUser'
+
 
 # Password validation
 AUTH_PASSWORD_VALIDATORS = [
