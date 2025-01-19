@@ -21,33 +21,19 @@ class UserViewSet(viewsets.ModelViewSet):
         """
         Assign permissions based on the action being performed.
         """
-<<<<<<< HEAD
-        if self.action in ['create']:
-            return [IsAdmin()]  # Restrict user creation to admins only
-        elif self.action in ['login']:
-            return [permissions.AllowAny()]  # Allow anyone to log in
-=======
         if self.action in ['create', 'login']:
             return [permissions.AllowAny()]
->>>>>>> 574110dd6dcb3717a7e05795ad1887ba00793b63
         elif self.action in ['list', 'destroy']:
-            return [IsAdmin()]
+            return [permissions.IsAdminUser()]  # Use Django's built-in IsAdminUser
         elif self.action in ['update', 'partial_update', 'deactivate']:
             return [IsAdminOrStaff()]
         elif self.action == 'profile':
             return [permissions.IsAuthenticated()]
         return super().get_permissions()
 
+
     @action(detail=False, methods=['post'], permission_classes=[permissions.AllowAny])
     def login(self, request):
-<<<<<<< HEAD
-        email = request.data.get('email')
-        password = request.data.get('password')
-        try:
-            user = CustomUser.objects.get(email=email)
-            if not user.check_password(password):
-                return Response({"error": "Invalid credentials"}, status=401)
-=======
         """
         Handle user login and return JWT tokens.
         """
@@ -55,7 +41,6 @@ class UserViewSet(viewsets.ModelViewSet):
         password = request.data.get('password')
         user = authenticate(username=username, password=password)
         if user:
->>>>>>> 574110dd6dcb3717a7e05795ad1887ba00793b63
             if not user.is_active:
                 return Response({"error": "Account is inactive"}, status=403)
             refresh = RefreshToken.for_user(user)
@@ -64,30 +49,33 @@ class UserViewSet(viewsets.ModelViewSet):
                 "access": str(refresh.access_token),
                 "role": user.role,
             })
-<<<<<<< HEAD
-        except CustomUser.DoesNotExist:
-            return Response({"error": "User with this email does not exist."}, status=401)
-=======
         return Response({"error": "Invalid credentials"}, status=401)
->>>>>>> 574110dd6dcb3717a7e05795ad1887ba00793b63
 
-    @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
+    @action(detail=False, methods=['get', 'put'], permission_classes=[permissions.IsAuthenticated])
     def profile(self, request):
         """
-        Retrieve the authenticated user's profile information.
+        GET: Retrieve the authenticated user's profile information.
+        PUT: Update the authenticated user's profile information.
         """
-        serializer = self.get_serializer(request.user)
-        return Response(serializer.data)
+        if request.method == "GET":
+            serializer = self.get_serializer(request.user)
+            return Response(serializer.data)
+        
+        if request.method == "PUT":
+            print("Incoming data for update:", request.data)
+            serializer = self.get_serializer(request.user, data=request.data, partial=True)
+            serializer.is_valid(raise_exception=True)
+            serializer.save()
+            return Response(serializer.data)
 
-    @action(detail=False, methods=['put'], permission_classes=[IsAuthenticated])
-    def update_profile(self, request):
+    def update(self, request, *args, **kwargs):
         """
-        Update the authenticated user's profile information.
+        Allow partial updates for the admin interface.
         """
-        serializer = self.get_serializer(request.user, data=request.data, partial=True)
+        serializer = self.get_serializer(data=request.data, instance=self.get_object(), partial=True)
         serializer.is_valid(raise_exception=True)
         serializer.save()
-        return Response(serializer.data)
+        return super().update(request, *args, **kwargs)
 
     @action(detail=True, methods=['patch'], permission_classes=[IsAdmin])
     def deactivate(self, request, pk=None):
@@ -98,6 +86,17 @@ class UserViewSet(viewsets.ModelViewSet):
         user.is_active = False
         user.save()
         return Response({"message": f"User {user.username} deactivated successfully"})
+    
+    @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated])
+    def deactivate_self(self, request):
+        """
+        Allow a user to deactivate their own account.
+        """
+        user = request.user
+        user.is_active = False
+        user.save()
+        return Response({"message": "Your account has been deactivated successfully."})
+
 
     @action(detail=False, methods=['post'], permission_classes=[IsAuthenticated])
     def change_password(self, request):
@@ -125,16 +124,50 @@ class UserViewSet(viewsets.ModelViewSet):
 
     def list(self, request, *args, **kwargs):
         """
-<<<<<<< HEAD
-        Disable the list view for all users.
-=======
-        Disable the list view for users.
->>>>>>> 574110dd6dcb3717a7e05795ad1887ba00793b63
+        Allow admins to list all users.
         """
-        return Response({"detail": "Not allowed."}, status=405)
+        if request.user.is_superuser or request.user.is_staff:
+            queryset = self.filter_queryset(self.get_queryset())
+            serializer = self.get_serializer(queryset, many=True)
+            return Response(serializer.data)
+        return Response({"detail": "Not allowed."}, status=403)
 
+    def get_queryset(self):
+        """
+        Apply filters for role and status.
+        """
+        queryset = super().get_queryset()
+
+        # Filter by role
+        role = self.request.query_params.get('role')
+        if role:
+            queryset = queryset.filter(role=role)
+
+        # Filter by status
+        status = self.request.query_params.get('status')
+        if status:
+            is_active = status.lower() == 'active'
+            queryset = queryset.filter(is_active=is_active)
+
+        return queryset
+    
     def retrieve(self, request, *args, **kwargs):
         """
         Disable the retrieve view for individual users.
         """
         return Response({"detail": "Not allowed."}, status=405)
+
+    def update(self, request, *args, **kwargs):
+        print("Incoming payload:", request.data)  # Log incoming data
+        serializer = self.get_serializer(data=request.data, instance=self.get_object(), partial=True)
+        if not serializer.is_valid():
+            print("Validation errors:", serializer.errors)  # Log validation errors
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        return super().update(request, *args, **kwargs)
+
+    def perform_create(self, serializer):
+        """
+        Perform any additional actions during creation.
+        """
+        user = serializer.save()
+        print(f"User created: {user.username}")  # Debug log for username

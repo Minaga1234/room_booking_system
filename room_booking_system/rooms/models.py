@@ -25,10 +25,6 @@ class UsageLog(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-<<<<<<< HEAD
-        return f"Usage Log for {self.room.name} by {self.user.username}"
-=======
         return f"Usage Log for {self.room.name} by {self.user.username}"
 
 
->>>>>>> 574110dd6dcb3717a7e05795ad1887ba00793b63

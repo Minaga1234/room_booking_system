@@ -5,6 +5,7 @@ from notifications.models import Notification  # Import Notification model
 
 class Penalty(models.Model):
     STATUS_CHOICES = (
+        ('active', 'Active'),
         ('unpaid', 'Unpaid'),
         ('paid', 'Paid'),
     )

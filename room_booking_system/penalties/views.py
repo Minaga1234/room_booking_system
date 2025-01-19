@@ -48,13 +48,19 @@ class PenaltyViewSet(viewsets.ModelViewSet):
         start_date = self.request.query_params.get('start_date', None)
         end_date = self.request.query_params.get('end_date', None)
 
+        print(f"Received status filter: {status}")  # Debug: Check received status
+        print(f"Filtering penalties with status: {status}")  # Debug: Check applied filter logic
+
         # Apply status filter
         if status == 'unpaid':
-            # Include only 'unpaid' and 'Active'
             queryset = queryset.filter(status__in=['unpaid', 'Active'])
         elif status == 'paid':
-            # Include only 'paid'
             queryset = queryset.filter(status='paid')
+        elif status == 'all':
+            # Default to all penalties
+            pass
+        else:
+            print(f"Invalid status received: {status}")
 
         # Apply date filters
         if start_date:
@@ -75,8 +81,9 @@ class PenaltyViewSet(viewsets.ModelViewSet):
             except Exception as e:
                 print(f"Invalid end_date format: {e}")
 
-        # Order by created_at descending
+        print(f"Filtering penalties with status: {status}, Final Count: {queryset.count()}")
         return queryset.order_by('-created_at')
+
 
 
     @action(detail=False, methods=['get'], permission_classes=[IsAuthenticated])
