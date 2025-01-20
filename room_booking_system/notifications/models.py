@@ -28,6 +28,7 @@ class Notification(models.Model):
     def create_notification(user, message, notification_type='general'):
         """Utility method to create a notification."""
         return Notification.objects.create(user=user, message=message, notification_type=notification_type)
+    print(f"Notification sent to {user}: {message}")
 
     def mark_as_read(self):
         """Mark the notification as read."""

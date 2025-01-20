@@ -5,16 +5,16 @@ from notifications.models import Notification  # Import Notification model
 
 class Penalty(models.Model):
     STATUS_CHOICES = (
-        ('active', 'Active'),
         ('unpaid', 'Unpaid'),
         ('paid', 'Paid'),
+        ('review_requested', 'Review Requested'),
     )
 
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     booking = models.ForeignKey(Booking, on_delete=models.SET_NULL, null=True, blank=True)
     reason = models.CharField(max_length=255)
     amount = models.DecimalField(max_digits=10, decimal_places=2)
-    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='unpaid')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='unpaid')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

@@ -16,7 +16,7 @@ from datetime import datetime, timezone  # Update the import
 from django.utils.dateparse import parse_date
 from django.utils.timezone import make_aware, get_default_timezone
 from django.db.models import Case, When, IntegerField
-
+from notifications.models import Notification
 
 class PenaltyPagination(PageNumberPagination):
     page_size = 5
@@ -53,9 +53,11 @@ class PenaltyViewSet(viewsets.ModelViewSet):
 
         # Apply status filter
         if status == 'unpaid':
-            queryset = queryset.filter(status__in=['unpaid', 'Active'])
+            queryset = queryset.filter(status='unpaid')
         elif status == 'paid':
             queryset = queryset.filter(status='paid')
+        if status == 'review_requested':
+            queryset = queryset.filter(status='review_requested')
         elif status == 'all':
             # Default to all penalties
             pass
@@ -121,21 +123,24 @@ class PenaltyViewSet(viewsets.ModelViewSet):
             'activePenalties': active_penalties_count,  # Include the global count here
         })
 
-
-
-
-
     @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
     def request_review(self, request, pk=None):
-        """Allow users to request a review of their penalties."""
-        penalty = self.get_object()
-        if penalty.user != request.user:
-            return Response({"error": "You can only request a review for your own penalties."}, status=403)
+        try:
+            penalty = self.get_object()
+            if penalty.status != 'unpaid':
+                return Response(
+                    {"error": "Only unpaid penalties can be reviewed."},
+                    status=400
+                )
+            
+            # Update penalty to request review
+            penalty.status = 'review_requested'
+            penalty.save()
+            return Response({"message": "Review request submitted successfully."}, status=200)
+        except Exception as e:
+            print(f"Error in request_review: {str(e)}")
+            return Response({"error": "An unexpected error occurred."}, status=500)
 
-        # Example logic for requesting a review
-        penalty.status = "review_requested"
-        penalty.save()
-        return Response({"message": "Review request submitted successfully."})
 
     @action(detail=True, methods=['post'], permission_classes=[IsAdminUser])
     def resolve(self, request, pk=None):
@@ -204,35 +209,46 @@ class PenaltyViewSet(viewsets.ModelViewSet):
     
     @action(detail=True, methods=['post'], permission_classes=[IsAdminUser])
     def approve_review(self, request, pk=None):
-        penalty = self.get_object()
-        if penalty.status == 'review_requested':
-            penalty.status = 'resolved'
-            penalty.save()
-            # Send notification to user
-            Notification.create_notification(
-                user=penalty.user,
-                message=f"Your penalty review (ID: {penalty.id}) has been approved.",
-                notification_type='penalty_update'
-            )
-            return Response({"message": "Penalty review approved successfully."})
-        return Response({"error": "Invalid status for approval."}, status=400)
+        try:
+            penalty = self.get_object()
+            print(f"Penalty: {penalty}")
+            if penalty.status == 'review_requested':
+                penalty.status = 'paid'
+                penalty.save()
+                print("Penalty status updated successfully.")
+                # Send notification to user
+                Notification.create_notification(
+                    user=penalty.user,
+                    message=f"Your penalty review (ID: {penalty.id}) has been approved.",
+                    notification_type='penalty_update'
+                )
+                return Response({"message": "Penalty review approved successfully."})
+            return Response({"error": "Invalid status for approval."}, status=400)
+        except Exception as e:
+            print(f"Error in approve_review: {str(e)}")  # Log the error for debugging
+            return Response({"error": "An unexpected error occurred."}, status=500)
+
 
     @action(detail=True, methods=['post'], permission_classes=[IsAdminUser])
     def reject_review(self, request, pk=None):
-        penalty = self.get_object()
-        if penalty.status == 'review_requested':
-            penalty.status = 'unpaid'  # Or revert to its previous state
-            penalty.save()
-            # Send notification to user
-            Notification.create_notification(
-                user=penalty.user,
-                message=f"Your penalty review (ID: {penalty.id}) has been rejected.",
-                notification_type='penalty_update'
-            )
-            return Response({"message": "Penalty review rejected successfully."})
-        return Response({"error": "Invalid status for rejection."}, status=400)
-
-
+        try:
+            penalty = self.get_object()
+            print(f"Penalty: {penalty}")
+            if penalty.status == 'review_requested':
+                penalty.status = 'unpaid'  # Or revert to its previous state
+                penalty.save()
+                print("Penalty status updated successfully.")
+                # Send notification to user
+                Notification.create_notification(
+                    user=penalty.user,
+                    message=f"Your penalty review (ID: {penalty.id}) has been rejected.",
+                    notification_type='penalty_update'
+                )
+                return Response({"message": "Penalty review rejected successfully."})
+            return Response({"error": "Invalid status for rejection."}, status=400)
+        except Exception as e:
+            print(f"Error in reject_review: {str(e)}")  # Log the error for debugging
+            return Response({"error": "An unexpected error occurred."}, status=500)
 
 
 @api_view(['GET'])
