@@ -8,7 +8,9 @@ from django.middleware.csrf import get_token
 from django.http import JsonResponse
 from .models import CustomUser
 from .serializers import UserSerializer
-from .permissions import IsAdmin, IsAdminOrStaff
+from django.contrib.auth import authenticate, login
+from .permissions import IsAdmin, IsAdminOrStaff\
+
 
 # CSRF Token View
 @api_view(['GET'])
@@ -80,10 +82,14 @@ class UserViewSet(viewsets.ModelViewSet):
 
         serializer = self.get_serializer(data={**data, "role": role})
         serializer.is_valid(raise_exception=True)
-        serializer.save()
+        user = serializer.save()
+        user.set_password(data["password"])  # Hash the password
+        user.save()
 
         return Response({"message": "User registered successfully!"}, status=status.HTTP_201_CREATED)
 
+
+    
     @action(detail=False, methods=['post'], permission_classes=[permissions.AllowAny])
     def login(self, request):
         """
@@ -91,6 +97,7 @@ class UserViewSet(viewsets.ModelViewSet):
         """
         email = request.data.get('email')
         password = request.data.get('password')
+
         try:
             user = CustomUser.objects.get(email=email)
         except CustomUser.DoesNotExist:
@@ -100,6 +107,17 @@ class UserViewSet(viewsets.ModelViewSet):
             if not user.is_active:
                 return Response({"error": "Account is inactive"}, status=status.HTTP_403_FORBIDDEN)
 
+            # Log the user in (creates sessionid cookie)
+            login(request, user)
+
+            # Log session information for debugging
+            session_key = request.session.session_key
+            if session_key:
+                print(f"Session created successfully. Session Key: {session_key}")
+            else:
+                print("Failed to create session.")
+
+            # Generate JWT tokens
             refresh = RefreshToken.for_user(user)
             return Response({
                 "refresh": str(refresh),
@@ -113,8 +131,13 @@ class UserViewSet(viewsets.ModelViewSet):
         """
         Retrieve the authenticated user's profile.
         """
-        serializer = self.get_serializer(request.user)
-        return Response(serializer.data)
+        try:
+            serializer = self.get_serializer(request.user)
+            return Response(serializer.data)
+        except Exception as e:
+            print(f"Error retrieving profile: {e}")
+            return Response({"error": "Failed to retrieve profile."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 
     @action(detail=False, methods=['post'], permission_classes=[permissions.IsAuthenticated])
     def change_password(self, request):
