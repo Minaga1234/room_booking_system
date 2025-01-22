@@ -55,7 +55,7 @@ class BookingSerializer(serializers.ModelSerializer):
         # Validate dynamic price
         data['price'] = Booking.calculate_dynamic_price(
             room=data['room'],
-            start_time=data['start_time'],
+            start_time=data['start_ time'],
             base_price=100  # Default base price
         )
 

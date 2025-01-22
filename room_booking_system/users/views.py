@@ -8,7 +8,9 @@ from django.middleware.csrf import get_token
 from django.http import JsonResponse
 from .models import CustomUser
 from .serializers import UserSerializer
-from .permissions import IsAdmin, IsAdminOrStaff
+from django.contrib.auth import authenticate, login
+from .permissions import IsAdmin, IsAdminOrStaff\
+
 
 # CSRF Token View
 @api_view(['GET'])
@@ -49,52 +51,47 @@ class UserViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['POST'], permission_classes=[permissions.AllowAny])
     def register_user(self, request):
         """
-        Register a new user.
+        Handles user registration. Accepts username, email, password, and role.
         """
-        try:
-            data = request.data
-            print("Incoming data:", data)  # Debug incoming data
+        data = request.data
+        role = data.get("role", "student").lower()
 
-            role = data.get("role", "student").lower()
-            if role == "lecturer":
-                role = "staff"
-            if role not in ["student", "staff", "admin"]:
-                return Response({"error": "Invalid role. Must be 'student', 'staff', or 'admin'."},
-                                status=status.HTTP_400_BAD_REQUEST)
+        # Map "lecturer" to "staff"
+        if role == "lecturer":
+            role = "staff"
 
-            if not data.get("username"):
-                return Response({"error": "Username is required."}, status=status.HTTP_400_BAD_REQUEST)
-            if not data.get("email"):
-                return Response({"error": "Email is required."}, status=status.HTTP_400_BAD_REQUEST)
-            if not data.get("password"):
-                return Response({"error": "Password is required."}, status=status.HTTP_400_BAD_REQUEST)
+        # Validate role
+        if role not in ["student", "staff", "admin"]:
+            return Response({"error": f'"{data.get("role")}" is not a valid choice.'},
+                            status=status.HTTP_400_BAD_REQUEST)
 
-            # Check for duplicates
-            if CustomUser.objects.filter(email=data["email"]).exists():
-                return Response({"error": "This email is already registered."}, status=status.HTTP_400_BAD_REQUEST)
-            if CustomUser.objects.filter(username=data["username"]).exists():
-                return Response({"error": "This username is already taken."}, status=status.HTTP_400_BAD_REQUEST)
+        # Validate required fields
+        if not data.get("username"):
+            return Response({"error": "Username is required."}, status=status.HTTP_400_BAD_REQUEST)
+        if not data.get("email"):
+            return Response({"error": "Email is required."}, status=status.HTTP_400_BAD_REQUEST)
+        if not data.get("password"):
+            return Response({"error": "Password is required."}, status=status.HTTP_400_BAD_REQUEST)
 
-            # Ensure is_staff is set properly for staff members
-            serializer = self.get_serializer(data={
-                "username": data["username"],
-                "email": data["email"],
-                "password": data["password"],
-                "role": role,
-                "is_staff": True if role == "staff" else False,
-            })
+        # Ensure email is unique
+        if CustomUser.objects.filter(email=data["email"]).exists():
+            return Response({"error": "Email is already registered."}, status=status.HTTP_400_BAD_REQUEST)
 
-            if not serializer.is_valid():
-                print("Validation errors:", serializer.errors)  # Debug validation errors
-                return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        # Ensure username is valid and unique
+        if not data["username"].isalnum():
+            return Response({"error": "Username can only contain letters and numbers."},
+                            status=status.HTTP_400_BAD_REQUEST)
 
-            serializer.save()
-            return Response({"message": "User registered successfully!"}, status=status.HTTP_201_CREATED)
+        serializer = self.get_serializer(data={**data, "role": role})
+        serializer.is_valid(raise_exception=True)
+        user = serializer.save()
+        user.set_password(data["password"])  # Hash the password
+        user.save()
 
-        except Exception as e:
-            print("Unexpected error:", str(e))  # Debug unexpected exceptions
-            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return Response({"message": "User registered successfully!"}, status=status.HTTP_201_CREATED)
 
+
+    
     @action(detail=False, methods=['post'], permission_classes=[permissions.AllowAny])
     def login(self, request):
         """
@@ -102,6 +99,7 @@ class UserViewSet(viewsets.ModelViewSet):
         """
         email = request.data.get('email')
         password = request.data.get('password')
+
         try:
             user = CustomUser.objects.get(email=email)
 
@@ -115,6 +113,17 @@ class UserViewSet(viewsets.ModelViewSet):
             if not user.is_active:
                 return Response({"error": "Account is inactive"}, status=status.HTTP_403_FORBIDDEN)
 
+            # Log the user in (creates sessionid cookie)
+            login(request, user)
+
+            # Log session information for debugging
+            session_key = request.session.session_key
+            if session_key:
+                print(f"Session created successfully. Session Key: {session_key}")
+            else:
+                print("Failed to create session.")
+
+            # Generate JWT tokens
             refresh = RefreshToken.for_user(user)
             return Response({
                 "refresh": str(refresh),
@@ -129,16 +138,13 @@ class UserViewSet(viewsets.ModelViewSet):
         """
         Retrieve basic public user profile data without requiring authentication.
         """
-        email = request.query_params.get("email")  # Expect `email` as a query param
-        if not email:
-            return Response({"error": "Email parameter is required."}, status=status.HTTP_400_BAD_REQUEST)
-
         try:
-            user = CustomUser.objects.get(email=email)
-            serializer = self.get_serializer(user)
-            return Response(serializer.data, status=status.HTTP_200_OK)
-        except CustomUser.DoesNotExist:
-            return Response({"error": "User not found."}, status=status.HTTP_404_NOT_FOUND)
+            serializer = self.get_serializer(request.user)
+            return Response(serializer.data)
+        except Exception as e:
+            print(f"Error retrieving profile: {e}")
+            return Response({"error": "Failed to retrieve profile."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 
     @action(detail=False, methods=['post'], permission_classes=[permissions.IsAuthenticated])
     def change_password(self, request):
