@@ -13,6 +13,6 @@ urlpatterns = [
     path('login/', UserViewSet.as_view({'post': 'login'}), name='user_login'),  # Login endpoint
     path('profile/', UserViewSet.as_view({'get': 'profile', 'put': 'update_profile'}), name='user_profile'),  # Profile endpoint
     path('change_password/', UserViewSet.as_view({'post': 'change_password'}), name='change_password'),  # Password change
-    path('deactivate/', UserViewSet.as_view({'post': 'deactivate_self'}), name='deactivate_self'),  # Self-deactivation
+    path('deactivate_self/', UserViewSet.as_view({'post': 'deactivate_self'}), name='deactivate_self'),  # Self-deactivation
     path('get-csrf-token/', get_csrf_token, name='get_csrf_token'),  # CSRF token endpoint
 ]

@@ -170,11 +170,34 @@ class UserViewSet(viewsets.ModelViewSet):
         user.is_active = False
         user.save()
         return Response({"message": f"User {user.username} deactivated successfully"})
+    
+    @action(detail=False, methods=['post'], permission_classes=[permissions.IsAuthenticated])
+    def change_password(self, request):
+        """
+        Change the authenticated user's password.
+        """
+        user = request.user
+        old_password = request.data.get('old_password')
+        new_password = request.data.get('new_password')
 
-    # Deactivate Self
+        if not user.check_password(old_password):
+            return Response({"error": "Incorrect old password"}, status=status.HTTP_400_BAD_REQUEST)
+
+        if not new_password:
+            return Response({"error": "New password cannot be empty"}, status=status.HTTP_400_BAD_REQUEST)
+
+        user.set_password(new_password)
+        user.save()
+        return Response({"message": "Password updated successfully"})
+
+
     @action(detail=False, methods=['post'], permission_classes=[permissions.IsAuthenticated])
     def deactivate_self(self, request):
+        """
+        Allow the authenticated user to deactivate their account.
+        """
         user = request.user
         user.is_active = False
         user.save()
         return Response({"message": "Your account has been deactivated successfully."})
+

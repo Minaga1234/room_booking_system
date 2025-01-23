@@ -34,6 +34,8 @@ class BookingSerializer(serializers.ModelSerializer):
         start_time = data.get('start_time')
         end_time = data.get('end_time')
 
+        print(f"Validating booking: room={room}, start_time={start_time}, end_time={end_time}")
+
         # Check for overlapping bookings
         overlapping = Booking.objects.filter(
             room=room,
@@ -42,10 +44,12 @@ class BookingSerializer(serializers.ModelSerializer):
         ).exists()
 
         if overlapping:
+            print(f"Overlapping booking detected for room={room}, start_time={start_time}, end_time={end_time}")
             raise serializers.ValidationError({"non_field_errors": ["Room is already booked for this time slot."]})
 
         # Validate start and end times
         if start_time >= end_time:
+            print(f"Invalid time range: start_time={start_time}, end_time={end_time}")
             raise serializers.ValidationError({"non_field_errors": ["Start time must be earlier than end time."]})
 
         return data
