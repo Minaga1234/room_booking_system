@@ -45,23 +45,9 @@ class CustomUser(AbstractUser):
     role = models.CharField(max_length=20, choices=ROLE_CHOICES, default="student")
     is_active = models.BooleanField(default=True)
 
-<<<<<<< HEAD
-    # Resolve conflicts with related_name
-    groups = models.ManyToManyField(
-        "auth.Group",
-        related_name="customuser_groups",
-        blank=True,
-    )
-    user_permissions = models.ManyToManyField(
-        "auth.Permission",
-        related_name="customuser_permissions",
-        blank=True,
-    )
-=======
     # Explicitly remove `first_name` and `last_name` fields
     first_name = None
     last_name = None
->>>>>>> acb9d2b23d41e44fdcbb38cd6149a704cead5322
 
     objects = CustomUserManager()  # Use the custom manager
 
