@@ -89,8 +89,6 @@ class UserViewSet(viewsets.ModelViewSet):
         user.save()
 
         return Response({"message": "User registered successfully!"}, status=status.HTTP_201_CREATED)
-
-
     
     @action(detail=False, methods=['post'], permission_classes=[permissions.AllowAny])
     def login(self, request):
