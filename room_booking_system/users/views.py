@@ -3,7 +3,7 @@ from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.filters import SearchFilter
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from django.middleware.csrf import get_token
 from django.http import JsonResponse
 from .models import CustomUser
@@ -36,15 +36,13 @@ class UserViewSet(viewsets.ModelViewSet):
         """
         Assign permissions based on action.
         """
-        if self.action in ['create']:
-            return [IsAdmin()]  # Restrict user creation to admins only
-        elif self.action in ['login', 'profile', 'register_user']:
-            return [permissions.AllowAny()]  # Allow anyone to log in or fetch public profile data
+        if self.action in ['register_user', 'login']:
+            return [permissions.AllowAny()]
         elif self.action in ['list', 'destroy']:
             return [IsAdmin()]
         elif self.action in ['update', 'partial_update', 'deactivate']:
             return [IsAdminOrStaff()]
-        elif self.action in ['change_password']:
+        elif self.action in ['profile', 'change_password']:
             return [permissions.IsAuthenticated()]
         return super().get_permissions()
 
@@ -100,10 +98,6 @@ class UserViewSet(viewsets.ModelViewSet):
 
         try:
             user = CustomUser.objects.get(email=email)
-
-            if user.role not in ["student", "staff", "admin"]:
-                return Response({"error": "Unknown user role. Please contact support."}, status=status.HTTP_400_BAD_REQUEST)
-
         except CustomUser.DoesNotExist:
             return Response({"error": "Invalid email or password"}, status=status.HTTP_401_UNAUTHORIZED)
 
@@ -128,13 +122,12 @@ class UserViewSet(viewsets.ModelViewSet):
                 "access": str(refresh.access_token),
                 "role": user.role,
             })
-
         return Response({"error": "Invalid email or password"}, status=status.HTTP_401_UNAUTHORIZED)
 
-    @action(detail=False, methods=['get'], permission_classes=[AllowAny])
+    @action(detail=False, methods=['get'], permission_classes=[permissions.IsAuthenticated])
     def profile(self, request):
         """
-        Retrieve basic public user profile data without requiring authentication.
+        Retrieve the authenticated user's profile.
         """
         try:
             serializer = self.get_serializer(request.user)
@@ -172,7 +165,7 @@ class UserViewSet(viewsets.ModelViewSet):
 
     def list(self, request, *args, **kwargs):
         """
-        Disable the list view for all users.
+        Disable listing all users.
         """
         return Response({"detail": "Not allowed."}, status=status.HTTP_405_METHOD_NOT_ALLOWED)
 

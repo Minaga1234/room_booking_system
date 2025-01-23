@@ -19,4 +19,5 @@ class Feedback(models.Model):
         return f"{self.full_name} - {self.content[:20]}"
 
     class Meta:
-        ordering = ['-created_at']
+            app_label = 'feedback'
+            ordering = ['-created_at']
