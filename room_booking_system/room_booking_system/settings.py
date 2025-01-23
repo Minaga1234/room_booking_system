@@ -176,11 +176,14 @@ CELERY_TASK_SERIALIZER = 'json'
 # Default Primary Key Field Type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-# CORS settings
+# CORS Settings for Development
 CORS_ALLOWED_ORIGINS = [
-    "http://127.0.0.1:5500",  # Frontend origin
-    "http://localhost:5500",  # Alternate localhost origin
+    "http://127.0.0.1:5500",
+    "http://localhost:5500",
 ]
+
+CSRF_COOKIE_SECURE = False  # Disable for development
+SESSION_COOKIE_SECURE = False  # Disable for development
 
 CSRF_TRUSTED_ORIGINS = [
     "http://127.0.0.1:5500",
