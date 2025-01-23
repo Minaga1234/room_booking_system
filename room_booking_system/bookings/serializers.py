@@ -1,31 +1,51 @@
 from rest_framework import serializers
-from .models import Booking
-from analytics.models import Analytics  # Ensure this import exists
+from django.contrib.auth import get_user_model
+from .models import Booking, Room
+
+User = get_user_model()
 
 class BookingSerializer(serializers.ModelSerializer):
+    user = serializers.StringRelatedField(read_only=True)  # Display username in responses
+    room = serializers.StringRelatedField(read_only=True)  # Display room name in responses
+    user_id = serializers.PrimaryKeyRelatedField(queryset=User.objects.all(), write_only=True)  # Accept user ID
+    room_id = serializers.PrimaryKeyRelatedField(queryset=Room.objects.all(), write_only=True)  # Accept room ID
+
     class Meta:
         model = Booking
         fields = '__all__'
 
+    def create(self, validated_data):
+        """
+        Handle the creation of a booking.
+        """
+        user = validated_data.pop('user_id')
+        room = validated_data.pop('room_id')
+        # Pass validation before saving
+        booking = Booking(user=user, room=room, **validated_data)
+        booking.clean()  # Call validation logic
+        booking.save()
+        return booking
+
     def validate(self, data):
+        """
+        Validate booking data to prevent overlaps and ensure logical times.
+        """
+        room = data.get('room_id')
+        start_time = data.get('start_time')
+        end_time = data.get('end_time')
+
         # Check for overlapping bookings
-        if Booking.objects.filter(
-            room=data['room'],
-            start_time__lt=data['end_time'],
-            end_time__gt=data['start_time'],
-        ).exists():
-            raise serializers.ValidationError("Room is already booked for this time.")
+        overlapping = Booking.objects.filter(
+            room=room,
+            start_time__lt=end_time,
+            end_time__gt=start_time,
+        ).exists()
 
-        # Validate peak usage
-        analytics = Analytics.objects.filter(room=data['room'], date=data['start_time'].date()).first()
-        if analytics and analytics.utilization_rate > 80 and data['user'].role == "student":
-            raise serializers.ValidationError("Bookings during peak usage are restricted for students.")
+        if overlapping:
+            raise serializers.ValidationError({"non_field_errors": ["Room is already booked for this time slot."]})
 
-        # Validate start and end time logic
-        if data['start_time'] >= data['end_time']:
-            raise serializers.ValidationError("Start time must be earlier than end time.")
-
-        # Dynamic price calculation
-        data['price'] = Booking.calculate_dynamic_price(data['room'], data['start_time'], base_price=100)
+        # Validate start and end times
+        if start_time >= end_time:
+            raise serializers.ValidationError({"non_field_errors": ["Start time must be earlier than end time."]})
 
         return data
