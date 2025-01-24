@@ -206,6 +206,66 @@ class BookingViewSet(viewsets.ModelViewSet):
             return Response({"error": str(e)}, status=403)
         except Exception as e:
             return Response({"error": f"Error during check-in: {str(e)}"}, status=500)
+        
+    @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
+    def check_out(self, request, pk=None):
+        """
+        Handle check-out for a booking. Apply penalties for overstaying.
+        """
+        try:
+            booking = self.get_object()
+            print(f"Debug: Booking {booking.id} fetched successfully.")
+
+            # Ensure the logged-in user is the owner of the booking
+            if booking.user != request.user:
+                raise PermissionDenied("You do not have permission to check out for this booking.")
+
+            # Ensure the booking is checked in before checking out
+            if booking.status != 'checked_in':
+                return Response({"message": "Only checked-in bookings can be checked out."}, status=400)
+
+            current_time = timezone.now()
+            print(f"Debug: Current time is {current_time}, Booking end time is {booking.end_time}.")
+
+            # Apply penalty if user overstayed
+            if current_time > booking.end_time:
+                self.apply_penalty(booking, reason="Overstay")
+                penalty_amount = booking.calculate_penalty()
+                print(f"Debug: Penalty applied for overstaying. Amount: {penalty_amount}.")
+
+                penalty_message = f"A penalty of ${penalty_amount} has been imposed for overstaying."
+                Notification.objects.create(
+                    user=booking.user,
+                    message=penalty_message,
+                    notification_type='penalty_reminder',
+                )
+                return Response(
+                    {"message": "Check-out successful with penalty.", "penalty_imposed": True, "penalty_amount": penalty_amount},
+                    status=200,
+                )
+
+            # Update the booking status to 'completed' or a valid status
+            booking.status = 'completed'  # Ensure this matches STATUS_CHOICES
+            booking.save()
+            print(f"Debug: Booking {booking.id} status updated to 'completed'.")
+
+            # Create a notification for the user
+            Notification.objects.create(
+                user=booking.user,
+                message=f"You have successfully checked out from your booking at {booking.room.name}.",
+                notification_type='booking_update'
+            )
+            print(f"Debug: Notification sent for booking {booking.id}.")
+
+            return Response({"message": "Check-out successful.", "penalty_imposed": False}, status=200)
+        except PermissionDenied as e:
+            print(f"Error: {str(e)}")
+            return Response({"error": str(e)}, status=403)
+        except Exception as e:
+            print(f"Error during check-out: {str(e)}")
+            return Response({"error": f"Error during check-out: {str(e)}"}, status=500)
+
+
 
 
     def apply_penalty(self, booking, reason="Late cancellation or no-show"):
