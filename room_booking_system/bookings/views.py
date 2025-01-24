@@ -12,7 +12,8 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.pagination import PageNumberPagination
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter
-
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.exceptions import PermissionDenied
 
 class BookingPagination(PageNumberPagination):
     page_size = 5  # Limit to 5 bookings per page
@@ -69,7 +70,10 @@ class BookingViewSet(viewsets.ModelViewSet):
         if room:
             filters['room__name'] = room
 
-        return queryset.filter(**filters)
+        print(f"Filters applied: {filters}")
+        queryset = queryset.filter(**filters)
+        print(f"Filtered queryset: {queryset}")
+        return queryset
 
     @action(detail=True, methods=['post'], permission_classes=[IsAdminUser])
     def approve(self, request, pk=None):
@@ -165,27 +169,44 @@ class BookingViewSet(viewsets.ModelViewSet):
             print(f"Error during booking creation: {e}")
             raise ValidationError({"detail": f"Booking creation failed: {e}"})
 
-    @action(detail=True, methods=['post'], permission_classes=[IsAdminUser])
+    @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
     def check_in(self, request, pk=None):
         """
         Mark a booking as checked in and notify the user.
         """
         try:
             booking = self.get_object()
+
+            # Ensure the logged-in user is the owner of the booking
+            if booking.user != request.user:
+                raise PermissionDenied("You do not have permission to check in for this booking.")
+
+            # Ensure the booking is approved and within the valid check-in period
             if booking.status != 'approved':
                 return Response({"message": "Only approved bookings can be checked in."}, status=400)
 
+            current_time = timezone.now()
+            if current_time < booking.start_time or current_time > booking.end_time:
+                return Response({"message": "Check-in is only allowed during the booking period."}, status=400)
+
+            # Update the booking status to checked_in
             booking.status = 'checked_in'
             booking.save()
+            print(f"Booking {booking.id} status updated to 'checked_in'.")
 
+            # Create a notification for the user
             Notification.objects.create(
                 user=booking.user,
                 message=f"You have successfully checked in for your booking at {booking.room.name}.",
                 notification_type='booking_update'
             )
+
             return Response({"message": "Check-in successful."}, status=200)
+        except PermissionDenied as e:
+            return Response({"error": str(e)}, status=403)
         except Exception as e:
             return Response({"error": f"Error during check-in: {str(e)}"}, status=500)
+
 
     def apply_penalty(self, booking, reason="Late cancellation or no-show"):
         """
