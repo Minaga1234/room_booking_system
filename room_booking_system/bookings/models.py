@@ -2,9 +2,7 @@ from django.db import models
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from rooms.models import Room
-from analytics.models import Analytics
-from branding.models import Degree
-from notifications.models import Notification  # Import Notification model
+from notifications.models import Notification
 from django.utils import timezone
 
 class Booking(models.Model):
@@ -15,25 +13,20 @@ class Booking(models.Model):
         ('canceled', 'Canceled'),
     )
 
-    user = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.CASCADE,
-        related_name="bookings"
-    )
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="bookings")
     room = models.ForeignKey(Room, on_delete=models.CASCADE, related_name="bookings")
-    degree_major = models.ForeignKey(Degree, on_delete=models.SET_NULL, null=True, blank=True)
-    purpose = models.TextField()
     start_time = models.DateTimeField()
     end_time = models.DateTimeField()
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
     is_approved = models.BooleanField(default=False)
     penalty_flag = models.BooleanField(default=False)
     checked_in = models.BooleanField(default=False)
-    price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-
+    price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    
     class Meta:
+        ordering = ['start_time']
         constraints = [
             models.UniqueConstraint(
                 fields=['room', 'start_time', 'end_time'],
@@ -43,7 +36,7 @@ class Booking(models.Model):
 
     def __str__(self):
         return f"Booking: {self.room.name} by {self.user.username} ({self.status})"
-    
+
     def clean(self):
         """
         Validate booking to prevent overlapping times and ensure logical booking times.
@@ -124,17 +117,3 @@ class Booking(models.Model):
         if self.status == 'approved' and not self.checked_in and self.start_time < timezone.now():
             return 100.00  # Example: No-show penalty
         return 0.00
-    
-    def destroy(self, request, *args, **kwargs):
-        booking = self.get_object()
-        # Check and apply penalties
-        self.check_for_penalty(booking)
-        # Notify user
-        Notification.objects.create(
-            user=booking.user,
-            message=f"Your booking for {booking.room.name} has been canceled.",
-            notification_type='booking_update'
-        )
-        return super().destroy(request, *args, **kwargs)
-
-    

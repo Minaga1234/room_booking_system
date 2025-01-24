@@ -155,35 +155,35 @@ class BookingViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         """
         Automatically approve bookings for rooms that do not require admin approval.
+        Validate and create a new booking.
         """
         try:
-            # Save the booking instance from the serializer
             booking = serializer.save()
 
-            # Check if the room associated with the booking requires admin approval
+            # Check if the room requires admin approval
             if not booking.room.requires_approval:
-                # Automatically approve the booking
-                booking.status = 'approved'  # Set the booking status to 'approved'
-                booking.is_approved = True  # Mark as approved
-                booking.save()  # Save the changes to the database
+                booking.status = 'approved'  # Automatically set the status to 'approved'
+                booking.is_approved = True  # Mark the booking as approved
+                booking.save()
 
-                # Send a notification to the user for automatic approval
+                # Send notification for automatic approval
                 Notification.objects.create(
                     user=booking.user,
                     message=f"Your booking for {booking.room.name} has been automatically approved.",
                     notification_type='booking_update',
                 )
             else:
-                # If the room requires admin approval, set the booking status to 'pending'
+                # Send notification for pending approval
                 Notification.objects.create(
                     user=booking.user,
                     message=f"Your booking for {booking.room.name} is pending admin approval.",
                     notification_type='booking_update',
                 )
+
         except Exception as e:
-            # Handle any exceptions during booking creation
             print(f"Error during booking creation: {e}")
             raise ValidationError({"detail": f"Booking creation failed: {e}"})
+
 
     @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
     def check_in(self, request, pk=None):

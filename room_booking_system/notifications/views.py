@@ -1,9 +1,10 @@
 from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from .models import Notification
 from .serializers import NotificationSerializer
+from rest_framework.exceptions import NotAuthenticated
 
 class NotificationViewSet(viewsets.ModelViewSet):
     """
@@ -11,14 +12,16 @@ class NotificationViewSet(viewsets.ModelViewSet):
     """
     queryset = Notification.objects.all()
     serializer_class = NotificationSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
 
     def get_queryset(self):
         """
         Filter notifications for the logged-in user.
         """
         user = self.request.user
+        print(f"Authenticated user: {user}")  # Debug log
         return Notification.objects.filter(user=user)
+
 
     @action(detail=False, methods=['get'])
     def my_notifications(self, request):
@@ -26,11 +29,10 @@ class NotificationViewSet(viewsets.ModelViewSet):
         Retrieve notifications for the logged-in user.
         Optional query parameter `unread` to filter unread notifications.
         """
-        """
-        Retrieve notifications for the logged-in user.
-        Optional query parameter `unread` to filter unread notifications.
-        """
-        user = request.user
+        user = self.request.user
+        if not user.is_authenticated:  # Ensure the user is authenticated
+            raise NotAuthenticated("User must be authenticated to view notifications.")
+        
         unread_only = request.query_params.get('unread', 'false').lower() == 'true'
         notifications = self.get_queryset()
         if unread_only:

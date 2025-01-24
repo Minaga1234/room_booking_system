@@ -14,7 +14,7 @@ class NotificationInline(admin.TabularInline):
 
 @admin.register(Booking)
 class BookingAdmin(admin.ModelAdmin):
-    list_display = ('room', 'user', 'degree_major', 'purpose', 'start_time', 'end_time', 'status', 'is_approved')
+    list_display = ('room', 'user', 'start_time', 'end_time', 'status', 'is_approved')
     list_filter = ('status', 'is_approved', 'created_at')
     search_fields = ('user__username', 'room__name')
     inlines = [NotificationInline]  # Include related notifications inline
