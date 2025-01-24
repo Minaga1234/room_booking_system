@@ -2,6 +2,7 @@
 from django.db import models
 from django.conf import settings
 from django.utils import timezone
+from django.contrib.postgres.fields import ArrayField  # Use ArrayField for a list of features (PostgreSQL)
 
 class Room(models.Model):
     name = models.CharField(max_length=100, unique=True)  # Unique room name
@@ -10,6 +11,8 @@ class Room(models.Model):
     is_available = models.BooleanField(default=True)  # Room availability
     requires_approval = models.BooleanField(default=False)  # Booking approval required
     image = models.ImageField(upload_to='room_images/', blank=True, null=True)  # Image upload
+    description = models.TextField(blank=True, null=True)  # Detailed room description
+    features = models.JSONField(blank=True, null=True)  # Store features as a JSON object (compatible with MySQL)
     is_deleted = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)  # Timestamp for room creation
     updated_at = models.DateTimeField(auto_now=True)  # Timestamp for last update
@@ -26,3 +29,5 @@ class UsageLog(models.Model):
 
     def __str__(self):
         return f"Usage Log for {self.room.name} by {self.user.username}"
+
+

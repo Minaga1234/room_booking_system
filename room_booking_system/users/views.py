@@ -6,11 +6,12 @@ from rest_framework.filters import SearchFilter
 from rest_framework.permissions import AllowAny
 from django.middleware.csrf import get_token
 from django.http import JsonResponse
+from django.contrib.auth import authenticate
 from .models import CustomUser
 from .serializers import UserSerializer
-from django.contrib.auth import authenticate, login
-from .permissions import IsAdmin, IsAdminOrStaff\
-
+from .permissions import IsAdmin, IsAdminOrStaff
+from django.db.models import Q
+from django.contrib.auth import login
 
 # CSRF Token View
 @api_view(['GET'])
@@ -24,9 +25,6 @@ def get_csrf_token(request):
 
 
 class UserViewSet(viewsets.ModelViewSet):
-    """
-    ViewSet for managing user-related operations.
-    """
     queryset = CustomUser.objects.all()
     serializer_class = UserSerializer
     filter_backends = [SearchFilter]
@@ -36,118 +34,161 @@ class UserViewSet(viewsets.ModelViewSet):
         """
         Assign permissions based on action.
         """
-        if self.action in ['create']:
-            return [IsAdmin()]  # Restrict user creation to admins only
-        elif self.action in ['login', 'profile', 'register_user']:
-            return [permissions.AllowAny()]  # Allow anyone to log in or fetch public profile data
+        if self.action in ['create', 'login', 'register_user']:
+            return [permissions.AllowAny()]
         elif self.action in ['list', 'destroy']:
             return [IsAdmin()]
         elif self.action in ['update', 'partial_update', 'deactivate']:
             return [IsAdminOrStaff()]
-        elif self.action in ['change_password']:
+        elif self.action in ['profile']:
             return [permissions.IsAuthenticated()]
         return super().get_permissions()
+    
+    def list(self, request, *args, **kwargs):
+        """
+        List users with optional filters for role, status, and search.
+        """
+        queryset = self.get_queryset()
 
-    @action(detail=False, methods=['POST'], permission_classes=[permissions.AllowAny])
+        # Apply role filter
+        role = request.query_params.get('role', None)
+        if role:
+            queryset = queryset.filter(role=role)
+
+        # Apply status filter
+        status = request.query_params.get('status', None)
+        if status:
+            is_active = status.lower() == 'active'
+            queryset = queryset.filter(is_active=is_active)
+
+        # Apply search filter
+        search = request.query_params.get('search', None)
+        if search:
+            queryset = queryset.filter(
+                Q(username__icontains=search) |
+                Q(email__icontains=search) |
+                Q(role__icontains=search)
+            )
+
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
+
+
+
+    # User Registration
+    @action(detail=False, methods=['post'], permission_classes=[permissions.AllowAny])
     def register_user(self, request):
         """
-        Handles user registration. Accepts username, email, password, and role.
+        Register a new user.
         """
-        data = request.data
-        role = data.get("role", "student").lower()
+        try:
+            data = request.data
+            role = data.get("role", "student").lower()
+            if role not in ["student", "staff", "admin"]:
+                return Response({"error": "Invalid role. Must be 'student', 'staff', or 'admin'."},
+                                status=status.HTTP_400_BAD_REQUEST)
 
-        # Map "lecturer" to "staff"
-        if role == "lecturer":
-            role = "staff"
+            # Check required fields
+            if not data.get("email"):
+                return Response({"error": "Email is required."}, status=status.HTTP_400_BAD_REQUEST)
+            if not data.get("password"):
+                return Response({"error": "Password is required."}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Validate role
-        if role not in ["student", "staff", "admin"]:
-            return Response({"error": f'"{data.get("role")}" is not a valid choice.'},
-                            status=status.HTTP_400_BAD_REQUEST)
+            # Check for duplicates
+            if CustomUser.objects.filter(email=data["email"]).exists():
+                return Response({"error": "This email is already registered."}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Validate required fields
-        if not data.get("username"):
-            return Response({"error": "Username is required."}, status=status.HTTP_400_BAD_REQUEST)
-        if not data.get("email"):
-            return Response({"error": "Email is required."}, status=status.HTTP_400_BAD_REQUEST)
-        if not data.get("password"):
-            return Response({"error": "Password is required."}, status=status.HTTP_400_BAD_REQUEST)
+            # Auto-generate a username from the email
+            username = data.get("username", data["email"].split('@')[0])
+            if CustomUser.objects.filter(username=username).exists():
+                return Response({"error": "This username is already taken."}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Ensure email is unique
-        if CustomUser.objects.filter(email=data["email"]).exists():
-            return Response({"error": "Email is already registered."}, status=status.HTTP_400_BAD_REQUEST)
+            # Ensure proper `is_staff` setting for staff/admin roles
+            is_staff = True if role in ["staff", "admin"] else False
 
-        # Ensure username is valid and unique
-        if not data["username"].isalnum():
-            return Response({"error": "Username can only contain letters and numbers."},
-                            status=status.HTTP_400_BAD_REQUEST)
+            serializer = self.get_serializer(data={
+                "username": username,
+                "email": data["email"],
+                "password": data["password"],
+                "role": role,
+                "is_staff": is_staff,
+            })
 
-        serializer = self.get_serializer(data={**data, "role": role})
-        serializer.is_valid(raise_exception=True)
-        user = serializer.save()
-        user.set_password(data["password"])  # Hash the password
-        user.save()
+            serializer.is_valid(raise_exception=True)
+            serializer.save()
+            return Response({"message": "User registered successfully!"}, status=status.HTTP_201_CREATED)
 
-        return Response({"message": "User registered successfully!"}, status=status.HTTP_201_CREATED)
-    
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
     @action(detail=False, methods=['post'], permission_classes=[permissions.AllowAny])
     def login(self, request):
         """
-        User login with email and password.
+        Login with email and password.
         """
         email = request.data.get('email')
         password = request.data.get('password')
 
+        # Validate input
+        if not email or not password:
+            return Response({"error": "Email and password are required."}, status=status.HTTP_400_BAD_REQUEST)
+
         try:
+            # Check if the user exists
             user = CustomUser.objects.get(email=email)
-
-            if user.role not in ["student", "staff", "admin"]:
-                return Response({"error": "Unknown user role. Please contact support."}, status=status.HTTP_400_BAD_REQUEST)
-
         except CustomUser.DoesNotExist:
             return Response({"error": "Invalid email or password"}, status=status.HTTP_401_UNAUTHORIZED)
 
-        if user.check_password(password):
-            if not user.is_active:
-                return Response({"error": "Account is inactive"}, status=status.HTTP_403_FORBIDDEN)
+        # Verify password
+        if not user.check_password(password):
+            return Response({"error": "Invalid email or password"}, status=status.HTTP_401_UNAUTHORIZED)
 
-            # Log the user in (creates sessionid cookie)
-            login(request, user)
+        # Check if the user is active
+        if not user.is_active:
+            return Response({"error": "Account is inactive"}, status=status.HTTP_403_FORBIDDEN)
 
-            # Log session information for debugging
-            session_key = request.session.session_key
-            if session_key:
-                print(f"Session created successfully. Session Key: {session_key}")
-            else:
-                print("Failed to create session.")
+        # Log the user in (session-based authentication)
+        login(request, user)
+        request.session.save()  # Explicitly save the session
 
-            # Generate JWT tokens
-            refresh = RefreshToken.for_user(user)
-            return Response({
-                "refresh": str(refresh),
-                "access": str(refresh.access_token),
-                "role": user.role,
-            })
+        # Generate JWT tokens
+        refresh = RefreshToken.for_user(user)
 
-        return Response({"error": "Invalid email or password"}, status=status.HTTP_401_UNAUTHORIZED)
-
-    @action(detail=False, methods=['get'], permission_classes=[AllowAny])
+        # Return tokens and session info
+        return Response({
+            "refresh": str(refresh),
+            "access": str(refresh.access_token),
+            "role": user.role,
+            "session_key": request.session.session_key,  # Verify session key
+        }, status=status.HTTP_200_OK)
+        
+    # Profile View
+    @action(detail=False, methods=['get', 'put'], permission_classes=[permissions.IsAuthenticated])
     def profile(self, request):
         """
-        Retrieve basic public user profile data without requiring authentication.
+        Manage the authenticated user's profile.
         """
-        try:
+        if request.method == "GET":
             serializer = self.get_serializer(request.user)
             return Response(serializer.data)
-        except Exception as e:
-            print(f"Error retrieving profile: {e}")
-            return Response({"error": "Failed to retrieve profile."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        elif request.method == "PUT":
+            serializer = self.get_serializer(request.user, data=request.data, partial=True)
+            serializer.is_valid(raise_exception=True)
+            serializer.save()
+            return Response(serializer.data)
 
-
+    # Deactivate User
+    @action(detail=True, methods=['patch'], permission_classes=[IsAdmin])
+    def deactivate(self, request, pk=None):
+        user = self.get_object()
+        user.is_active = False
+        user.save()
+        return Response({"message": f"User {user.username} deactivated successfully"})
+    
     @action(detail=False, methods=['post'], permission_classes=[permissions.IsAuthenticated])
     def change_password(self, request):
         """
-        Change password for the authenticated user.
+        Change the authenticated user's password.
         """
         user = request.user
         old_password = request.data.get('old_password')
@@ -156,28 +197,20 @@ class UserViewSet(viewsets.ModelViewSet):
         if not user.check_password(old_password):
             return Response({"error": "Incorrect old password"}, status=status.HTTP_400_BAD_REQUEST)
 
+        if not new_password:
+            return Response({"error": "New password cannot be empty"}, status=status.HTTP_400_BAD_REQUEST)
+
         user.set_password(new_password)
         user.save()
         return Response({"message": "Password updated successfully"})
 
-    @action(detail=True, methods=['patch'], permission_classes=[IsAdmin])
-    def deactivate(self, request, pk=None):
+
+    @action(detail=False, methods=['post'], permission_classes=[permissions.IsAuthenticated])
+    def deactivate_self(self, request):
         """
-        Deactivate a user account (Admin only).
+        Allow the authenticated user to deactivate their account.
         """
-        user = self.get_object()
+        user = request.user
         user.is_active = False
         user.save()
-        return Response({"message": f"User {user.username} deactivated successfully."})
-
-    def list(self, request, *args, **kwargs):
-        """
-        Disable the list view for all users.
-        """
-        return Response({"detail": "Not allowed."}, status=status.HTTP_405_METHOD_NOT_ALLOWED)
-
-    def retrieve(self, request, *args, **kwargs):
-        """
-        Disable retrieving individual user details.
-        """
-        return Response({"detail": "Not allowed."}, status=status.HTTP_405_METHOD_NOT_ALLOWED)
+        return Response({"message": "Your account has been deactivated successfully."})

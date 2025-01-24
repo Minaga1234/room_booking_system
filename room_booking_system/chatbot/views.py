@@ -38,7 +38,7 @@ def chatbot_api(request):
             # Fetch the logged-in user
             logged_in_user = request.user if request.user.is_authenticated else None
             logger.debug(f"Logged-in User: {logged_in_user}")
-
+            
             # Generate chatbot response
             chatbot_response = get_chatbot_response(user_input, logged_in_user)
             return chatbot_response

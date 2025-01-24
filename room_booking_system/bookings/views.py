@@ -1,182 +1,224 @@
 from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from rest_framework.permissions import IsAdminUser, IsAuthenticated, AllowAny
-from rest_framework.exceptions import ValidationError
-from django.utils import timezone
-from django.db.models import Count
-from datetime import date, timedelta
-from .models import Booking, Room
+from rest_framework.permissions import IsAdminUser
+from .models import Booking
 from .serializers import BookingSerializer
-from analytics.models import Analytics
+from penalties.models import Penalty
+from datetime import date
+from django.utils import timezone
 from notifications.models import Notification
-from penalties.views import PenaltyViewSet
-from rest_framework.decorators import api_view
-from rest_framework.response import Response
-from datetime import datetime
-from users.models import CustomUser 
+from rest_framework.exceptions import ValidationError
+from rest_framework.pagination import PageNumberPagination
+from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework.filters import SearchFilter
+
+
+class BookingPagination(PageNumberPagination):
+    page_size = 5  # Limit to 5 bookings per page
+
 
 class BookingViewSet(viewsets.ModelViewSet):
-    queryset = Booking.objects.all()
+    queryset = Booking.objects.all().order_by('-status')
     serializer_class = BookingSerializer
-    permission_classes = [AllowAny]
-    
-    def get_permissions(self):
-        """
-        Custom permissions based on action.
-        """
-        if self.action in ['create']:
-            return [AllowAny()]  # Allow anyone to create a booking
-        return [IsAuthenticated()]  # Require authentication for other actions
+    pagination_class = BookingPagination
+    filter_backends = [DjangoFilterBackend, SearchFilter]
+    filterset_fields = ['status', 'user__username', 'room__name']  # Fields for filtering
+    search_fields = ['user__username', 'room__name']  # Enable search functionality
 
-    
     @action(detail=False, methods=['get'])
     def my_bookings(self, request):
         """
         Fetch bookings for the currently logged-in user.
         """
-        user_email = request.GET.get('email')
-        if not user_email:
-            return Response({"error": "Email is required to fetch bookings."}, status=400)
-
-        user_bookings = Booking.objects.filter(user__email=user_email)
+        user = request.user
+        user_bookings = Booking.objects.filter(user=user)
         serializer = self.get_serializer(user_bookings, many=True)
         return Response(serializer.data)
+
+    @action(detail=False, methods=['get'], url_path='count-pending')
+    def count_pending(self, request):
+        """
+        Return the count of bookings with status 'pending'.
+        Allow filtering by user and room.
+        """
+        filters = {}
+        user = request.query_params.get('user')
+        room = request.query_params.get('room')
+
+        if user:
+            filters['user__username'] = user  # Filter by username
+        if room:
+            filters['room__name'] = room  # Filter by room name
+
+        count = Booking.objects.filter(status='pending', **filters).count()
+        return Response({'remaining_approvals': count})
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        filters = {}
+
+        status = self.request.query_params.get('status')
+        user = self.request.query_params.get('user')
+        room = self.request.query_params.get('room')
+
+        if status:
+            filters['status'] = status
+        if user:
+            filters['user__username'] = user
+        if room:
+            filters['room__name'] = room
+
+        return queryset.filter(**filters)
 
     @action(detail=True, methods=['post'], permission_classes=[IsAdminUser])
     def approve(self, request, pk=None):
         """
         Approve a pending booking and notify the user.
         """
-        booking = self.get_object()
-        if booking.status == 'approved':
-            return Response({"message": "Booking is already approved."}, status=400)
+        try:
+            booking = self.get_object()
+            if booking.status == 'approved':
+                return Response({"message": "Booking is already approved."}, status=400)
 
-        booking.status = 'approved'
-        booking.is_approved = True
-        booking.save()
+            booking.status = 'approved'
+            booking.is_approved = True
+            booking.save()
 
-        Notification.objects.create(
-            user=booking.user,
-            message=f"Your booking for {booking.room.name} has been approved.",
-            notification_type='booking_update'
-        )
-        return Response({"message": "Booking approved."})
+            Notification.objects.create(
+                user=booking.user,
+                message=f"Your booking for {booking.room.name} has been approved.",
+                notification_type='booking_update'
+            )
+            return Response({"message": "Booking approved successfully."}, status=200)
+        except Exception as e:
+            return Response({"error": f"Error approving booking: {str(e)}"}, status=500)
 
     @action(detail=True, methods=['post'], permission_classes=[IsAdminUser])
     def cancel(self, request, pk=None):
         """
-        Cancel a booking and apply penalties if needed.
+        Cancel a booking and apply penalties if applicable.
+        """
+        try:
+            booking = self.get_object()
+            if booking.status == 'canceled':
+                return Response({"message": "Booking is already canceled."}, status=400)
+
+            if booking.status not in ['canceled', 'checked_in']:
+                self.apply_penalty(booking, "Canceled by admin.")
+
+            booking.status = 'canceled'
+            booking.save()
+
+            Notification.objects.create(
+                user=booking.user,
+                message=f"Your booking for {booking.room.name} has been canceled.",
+                notification_type='booking_update'
+            )
+            return Response({"message": "Booking canceled successfully."}, status=200)
+        except Exception as e:
+            return Response({"error": f"Error canceling booking: {str(e)}"}, status=500)
+
+    def check_for_penalty(self, booking):
+        """
+        Check if a penalty should be applied for late cancellation or no-show.
+        """
+        if booking.end_time < timezone.now() and not booking.is_approved:
+            penalty, created = Penalty.objects.get_or_create(
+                user=booking.user,
+                booking=booking,
+                reason="Late cancellation or no-show",
+                defaults={
+                    "amount": 50.00,
+                    "status": "unpaid"
+                }
+            )
+            if created:
+                Notification.objects.create(
+                    user=booking.user,
+                    message=f"A penalty of ${penalty.amount} has been imposed for {penalty.reason}.",
+                    notification_type='penalty_reminder'
+                )
+
+    def destroy(self, request, *args, **kwargs):
+        """
+        Apply penalty for late cancellation before deleting a booking.
         """
         booking = self.get_object()
-        if booking.status not in ['canceled', 'checked_in']:
-            PenaltyViewSet.apply_penalty(booking)
-
-        booking.status = 'canceled'
-        booking.save()
-
-        Notification.objects.create(
-            user=booking.user,
-            message=f"Your booking for {booking.room.name} has been canceled.",
-            notification_type='booking_update'
-        )
-        return Response({"message": "Booking canceled."})
-
-    @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
-    def cancel_own_booking(self, request, pk=None):
-        """
-        Allow booking owners to cancel their own bookings.
-        """
-        booking = self.get_object()
-        if booking.user != request.user:
-            return Response({"error": "You can only cancel your own bookings."}, status=403)
-
-        if booking.status == 'canceled':
-            return Response({"message": "This booking is already canceled."}, status=400)
-
-        booking.status = 'canceled'
-        booking.save()
-
-        Notification.objects.create(
-            user=booking.user,
-            message=f"Your booking for {booking.room.name} has been canceled.",
-            notification_type='booking_update'
-        )
-        return Response({"message": "Your booking has been successfully canceled."})
+        self.check_for_penalty(booking)
+        return super().destroy(request, *args, **kwargs)
 
     def perform_create(self, serializer):
-        user_email = self.request.data.get("email")
-        user = self.request.user  # Ensure the user is retrieved correctly
-        serializer.save(user=user)
+        """
+        Automatically approve bookings for rooms that do not require admin approval.
+        """
+        try:
+            # Save the booking instance from the serializer
+            booking = serializer.save()
 
-        if user_email:
-            try:
-                user = CustomUser.objects.get(email=user_email)
-            except CustomUser.DoesNotExist:
-                raise ValidationError("User not found. Please register first.")
-        else:
-            if self.request.user.is_authenticated:
-                user = self.request.user
+            # Check if the room associated with the booking requires admin approval
+            if not booking.room.requires_approval:
+                # Automatically approve the booking
+                booking.status = 'approved'  # Set the booking status to 'approved'
+                booking.is_approved = True  # Mark as approved
+                booking.save()  # Save the changes to the database
+
+                # Send a notification to the user for automatic approval
+                Notification.objects.create(
+                    user=booking.user,
+                    message=f"Your booking for {booking.room.name} has been automatically approved.",
+                    notification_type='booking_update',
+                )
             else:
-                raise ValidationError("Email or authentication token required to identify the user.")
+                # If the room requires admin approval, set the booking status to 'pending'
+                Notification.objects.create(
+                    user=booking.user,
+                    message=f"Your booking for {booking.room.name} is pending admin approval.",
+                    notification_type='booking_update',
+                )
+        except Exception as e:
+            # Handle any exceptions during booking creation
+            print(f"Error during booking creation: {e}")
+            raise ValidationError({"detail": f"Booking creation failed: {e}"})
 
-        # Get the booking start date from the serializer data
-        start_time = serializer.validated_data.get('start_time')
-        if not start_time:
-            raise ValidationError("Start time is required for the booking.")
+    @action(detail=True, methods=['post'], permission_classes=[IsAdminUser])
+    def check_in(self, request, pk=None):
+        """
+        Mark a booking as checked in and notify the user.
+        """
+        try:
+            booking = self.get_object()
+            if booking.status != 'approved':
+                return Response({"message": "Only approved bookings can be checked in."}, status=400)
 
-        # Enforce role-based booking date rules
-        role = user.role if user else "guest"
-        today = timezone.now().date()
-        tomorrow = today + timedelta(days=1)
+            booking.status = 'checked_in'
+            booking.save()
 
-        if role == 'student':
-            # Students can only book for today
-            if start_time.date() != today:
-                raise ValidationError("Students can only book for today.")
-        elif role == 'staff':
-            # Staff can only book for today or tomorrow
-            if start_time.date() not in [today, tomorrow]:
-                raise ValidationError("Lecturers can only book for today or tomorrow.")
-        elif role == 'admin':
-            # Admins can book for any date (no restrictions)
-            pass
-        else:
-            raise ValidationError("Unknown user role. Please contact support.")
+            Notification.objects.create(
+                user=booking.user,
+                message=f"You have successfully checked in for your booking at {booking.room.name}.",
+                notification_type='booking_update'
+            )
+            return Response({"message": "Check-in successful."}, status=200)
+        except Exception as e:
+            return Response({"error": f"Error during check-in: {str(e)}"}, status=500)
 
-        # Save the booking with the associated user
-        serializer.save(user=user)
-        
-    @action(detail=False, methods=['get'])
-    def calendar_events(self, request):
-        bookings = Booking.objects.all()
-        events = [
-            {
-                "id": booking.id,
-                "title": f"{booking.room.name} - {booking.user.username}",
-                "start": booking.start_time.isoformat(),
-                "end": booking.end_time.isoformat()
+    def apply_penalty(self, booking, reason="Late cancellation or no-show"):
+        """
+        Apply penalty to the user for specific reasons.
+        """
+        penalty, created = Penalty.objects.get_or_create(
+            user=booking.user,
+            booking=booking,
+            reason=reason,
+            defaults={
+                "amount": booking.calculate_penalty(),
+                "status": "unpaid"
             }
-            for booking in bookings
-        ]
-        return Response(events)
-
-    @action(detail=False, methods=['get'])
-    def popular_rooms(self, request):
-        """
-        Get the most popular rooms based on booking counts.
-        """
-        popular_rooms = Booking.objects.values('room__name').annotate(
-            booking_count=Count('id')
-        ).order_by('-booking_count')
-        return Response(popular_rooms)
-
-    @action(detail=False, methods=['get'])
-    def traffic_data(self, request):
-        """
-        Get traffic data based on bookings and check-ins.
-        """
-        analytics = Analytics.objects.all().values('room__name', 'date', 'total_bookings', 'total_checkins')
-        return Response(analytics)
-    
-    
+        )
+        if created:
+            Notification.objects.create(
+                user=booking.user,
+                message=f"A penalty of ${penalty.amount} has been imposed for {penalty.reason}.",
+                notification_type='penalty_reminder'
+            )

@@ -1,6 +1,7 @@
 from django.contrib.auth.models import AbstractUser, BaseUserManager
-from django.core.validators import RegexValidator
 from django.db import models
+from django.core.validators import RegexValidator
+
 
 class CustomUserManager(BaseUserManager):
     """
@@ -37,17 +38,26 @@ class CustomUser(AbstractUser):
         ("student", "Student"),
     ]
 
-    # Removed unnecessary fields
-    first_name = None
-    last_name = None
-    phone_number = None
-
     role = models.CharField(max_length=20, choices=ROLE_CHOICES, default="student")
+    phone_number = models.CharField(
+        max_length=15,
+        blank=True,
+        null=True,
+        validators=[RegexValidator(r'^\d{10,15}$', "Enter a valid phone number.")],
+    )
     is_active = models.BooleanField(default=True)
 
-    # Explicitly remove `first_name` and `last_name` fields
-    first_name = None
-    last_name = None
+    # Resolve conflicts with related_name
+    groups = models.ManyToManyField(
+        "auth.Group",
+        related_name="customuser_groups",
+        blank=True,
+    )
+    user_permissions = models.ManyToManyField(
+        "auth.Permission",
+        related_name="customuser_permissions",
+        blank=True,
+    )
 
     objects = CustomUserManager()  # Use the custom manager
 
@@ -60,6 +70,7 @@ class CustomUser(AbstractUser):
         constraints = [
             models.UniqueConstraint(fields=["email"], name="unique_email_constraint"),
         ]
+
 
 class UserProfile(models.Model):
     """

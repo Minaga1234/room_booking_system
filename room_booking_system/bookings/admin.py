@@ -1,4 +1,5 @@
 from django.contrib import admin
+from django.core.exceptions import ValidationError
 from .models import Booking
 from notifications.models import Notification
 
@@ -20,12 +21,42 @@ class BookingAdmin(admin.ModelAdmin):
 
     actions = ['approve_bookings', 'cancel_bookings']
 
+    def save_model(self, request, obj, form, change):
+        """
+        Override save_model to validate the booking before saving.
+        """
+        try:
+            obj.clean()  # Call validation before saving
+            super().save_model(request, obj, form, change)
+        except ValidationError as e:
+            self.message_user(request, f"Error: {e.message}", level="error")
+
     def approve_bookings(self, request, queryset):
-        queryset.update(status='approved', is_approved=True)
-        self.message_user(request, "Selected bookings have been approved.")
+        """
+        Action to approve selected bookings.
+        """
+        for booking in queryset:
+            try:
+                booking.status = 'approved'
+                booking.is_approved = True
+                booking.save()
+                self.message_user(request, f"Booking for {booking.room.name} approved successfully.")
+            except ValidationError as e:
+                self.message_user(request, f"Error approving booking for {booking.room.name}: {e.message}", level="error")
+
     approve_bookings.short_description = "Approve selected bookings"
 
     def cancel_bookings(self, request, queryset):
-        queryset.update(status='canceled', is_approved=False)
-        self.message_user(request, "Selected bookings have been canceled.")
+        """
+        Action to cancel selected bookings.
+        """
+        for booking in queryset:
+            try:
+                booking.status = 'canceled'
+                booking.is_approved = False
+                booking.save()
+                self.message_user(request, f"Booking for {booking.room.name} canceled successfully.")
+            except ValidationError as e:
+                self.message_user(request, f"Error canceling booking for {booking.room.name}: {e.message}", level="error")
+
     cancel_bookings.short_description = "Cancel selected bookings"

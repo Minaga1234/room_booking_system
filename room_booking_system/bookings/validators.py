@@ -1,28 +1,20 @@
 from django.core.exceptions import ValidationError
-from analytics.models import Analytics
+from bookings.models import Booking
 from django.utils.timezone import localtime
 
 def validate_peak_usage(room, start_time, end_time):
     """
-    Validate booking duration during peak hours.
+    Validate booking to ensure no overlap during the specified time.
     """
-    analytics = Analytics.objects.filter(room=room, date=start_time.date()).first()
-    if not analytics:
-        return  # No analytics data yet, proceed with validation.
+    # Prevent overlapping bookings for the same room
+    overlapping_bookings = Booking.objects.filter(
+        room=room,
+        start_time__lt=end_time,
+        end_time__gt=start_time,
+    )
+    if overlapping_bookings.exists():
+        raise ValidationError("The room is already booked during the specified time.")
 
-    # Check if booking falls within peak utilization hours
-    peak_hours = analytics.peak_hours or {}
-    start_hour = localtime(start_time).hour
-    end_hour = localtime(end_time).hour
-
-    for hour in range(start_hour, end_hour):
-        hour_label = f"{hour}:00-{hour + 1}:00"
-        if peak_hours.get(hour_label, 0) > 5:  # Example threshold: >5 bookings/hour
-            raise ValidationError("Booking duration exceeds allowed limit during peak hours.")
-
-    """
-    Validate if booking complies with peak usage rules.
-    """
-    analytics = Analytics.objects.filter(room=room, date=start_time.date()).first()
-    if analytics and analytics.utilization_rate > 80:
-        raise ValidationError("Peak usage restrictions apply. Please choose another time slot.")
+    # Additional validation to ensure start time is before end time
+    if start_time >= end_time:
+        raise ValidationError("Start time must be before end time.")

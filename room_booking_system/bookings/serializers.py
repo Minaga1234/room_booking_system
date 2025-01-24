@@ -1,68 +1,59 @@
 from rest_framework import serializers
+from django.contrib.auth import get_user_model
+from .models import Booking, Room
+from users.models import CustomUser 
 from rest_framework.exceptions import ValidationError
-from .models import Booking, Analytics
-from branding.models import Degree
-from datetime import datetime, timedelta
-from users.models import CustomUser  # Import the correct user model
-from django.utils.timezone import is_naive, make_aware
+
+User = get_user_model()
 
 class BookingSerializer(serializers.ModelSerializer):
-    degree_major = serializers.PrimaryKeyRelatedField(queryset=Degree.objects.all(), required=False)
-    email = serializers.EmailField(write_only=True, required=False)  # Optional email field for dynamic user identification
+    user = serializers.StringRelatedField(read_only=True)  # Display username in responses
+    room = serializers.StringRelatedField(read_only=True)  # Display room name in responses
+    user_id = serializers.PrimaryKeyRelatedField(queryset=User.objects.all(), write_only=True)  # Accept user ID
+    room_id = serializers.PrimaryKeyRelatedField(queryset=Room.objects.all(), write_only=True)  # Accept room ID
 
     class Meta:
         model = Booking
         fields = '__all__'
         read_only_fields = ['user', 'price', 'is_approved', 'penalty_flag', 'checked_in', 'created_at', 'updated_at']
 
+    def create(self, validated_data):
+        """
+        Handle the creation of a booking.
+        """
+        user = validated_data.pop('user_id')
+        room = validated_data.pop('room_id')
+        # Pass validation before saving
+        booking = Booking(user=user, room=room, **validated_data)
+        booking.clean()  # Call validation logic
+        booking.save()
+        return booking
+
     def validate(self, data):
         """
-        Additional validations for booking.
+        Validate booking data to prevent overlaps and ensure logical times.
         """
-        # Ensure start_time and end_time are timezone-aware
-        if is_naive(data['start_time']):
-            data['start_time'] = make_aware(data['start_time'])
-        if is_naive(data['end_time']):
-            data['end_time'] = make_aware(data['end_time'])
+        room = data.get('room_id')
+        start_time = data.get('start_time')
+        end_time = data.get('end_time')
 
-        # Prevent overlapping bookings
-        if Booking.objects.filter(
-            room=data['room'],
-            start_time__lt=data['end_time'],
-            end_time__gt=data['start_time'],
-        ).exclude(id=self.instance.id if self.instance else None).exists():
-            raise ValidationError("This room is already booked during the selected time.")
+        print(f"Validating booking: room={room}, start_time={start_time}, end_time={end_time}")
 
-        # Validate that start_time is before end_time
-        if data['start_time'] >= data['end_time']:
-            raise ValidationError("Start time must be before end time.")
+        # Check for overlapping bookings
+        overlapping = Booking.objects.filter(
+            room=room,
+            start_time__lt=end_time,
+            end_time__gt=start_time,
+        ).exists()
 
-        # Validate role-based booking restrictions
-        user = self.context['request'].user if self.context['request'].user.is_authenticated else None
-        role = getattr(user, 'role', 'student')  # Default to 'student' if no user is authenticated
-        today = datetime.now()
-        tomorrow = today + timedelta(days=1)
+        if overlapping:
+            print(f"Overlapping booking detected for room={room}, start_time={start_time}, end_time={end_time}")
+            raise serializers.ValidationError({"non_field_errors": ["Room is already booked for this time slot."]})
 
-        if role == 'student':
-            # Students can only book for today
-            if data['start_time'].date() != today.date():
-                raise ValidationError("Students can only book for today.")
-        elif role == 'staff':
-            # Staff can book for today or tomorrow
-            if data['start_time'].date() not in [today.date(), tomorrow.date()]:
-                raise ValidationError("Staff can only book for today or tomorrow.")
-
-        # Validate dynamic price
-        data['price'] = Booking.calculate_dynamic_price(
-            room=data['room'],
-            start_time=data['start_ time'],
-            base_price=100  # Default base price
-        )
-
-        # Validate peak usage for students
-        analytics = Analytics.objects.filter(room=data['room'], date=data['start_time'].date()).first()
-        if analytics and analytics.utilization_rate > 80 and role == "student":
-            raise ValidationError("Bookings during peak usage are restricted for students.")
+        # Validate start and end times
+        if start_time >= end_time:
+            print(f"Invalid time range: start_time={start_time}, end_time={end_time}")
+            raise serializers.ValidationError({"non_field_errors": ["Start time must be earlier than end time."]})
 
         return data
 

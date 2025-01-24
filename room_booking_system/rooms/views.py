@@ -6,16 +6,11 @@ from .models import Room, UsageLog
 from bookings.models import Booking  # Import Booking directly
 from .serializers import RoomSerializer, UsageLogSerializer
 from .permissions import IsAdminOrReadOnly  # Custom permission
-from rest_framework.permissions import IsAuthenticated, IsAuthenticatedOrReadOnly
-from users.permissions import IsAdminOrStaff, IsAdmin
-from rest_framework.decorators import api_view
-from rest_framework.response import Response
-from datetime import datetime
 
 class RoomViewSet(viewsets.ModelViewSet):
     queryset = Room.objects.all()
     serializer_class = RoomSerializer
-    permission_classes = [IsAuthenticatedOrReadOnly]  # Read-only access for unauthenticated users
+    permission_classes = [IsAdminOrReadOnly]  # Admins can modify; others can only view
 
     def get_queryset(self):
         """
@@ -84,46 +79,3 @@ class RoomViewSet(viewsets.ModelViewSet):
         log.end_time = timezone.now()
         log.save()
         return Response({"message": "Room usage ended.", "log": UsageLogSerializer(log).data})
-    
-    @action(detail=True, methods=['post'], permission_classes=[IsAdmin])
-    def approve_room(self, request, pk=None):
-        """
-        Approve a room. Only admins can perform this action.
-        """
-        room = self.get_object()
-        room.requires_approval = False
-        room.save()
-        return Response({"message": f"Room {room.name} approved."})
-
-@api_view(['GET'])
-def room_availability(request, pk):
-    """
-    Check availability of a room for a given time slot.
-    """
-    start_time = request.GET.get('start_time')
-    end_time = request.GET.get('end_time')
-
-    if not start_time or not end_time:
-        return Response({"error": "start_time and end_time are required parameters."}, status=400)
-
-    try:
-        start_time = datetime.fromisoformat(start_time)
-        end_time = datetime.fromisoformat(end_time)
-    except ValueError:
-        return Response({"error": "Invalid date format. Use ISO format (YYYY-MM-DDTHH:MM:SS)."}, status=400)
-
-    try:
-        room = Room.objects.get(pk=pk)
-    except Room.DoesNotExist:
-        return Response({"error": "Room not found."}, status=404)
-
-    overlapping_bookings = Booking.objects.filter(
-        room=room,
-        start_time__lt=end_time,
-        end_time__gt=start_time,
-    )
-
-    if overlapping_bookings.exists():
-        return Response({"available": False, "message": "The room is not available for the selected time slot."})
-
-    return Response({"available": True, "message": "The room is available for the selected time slot."})

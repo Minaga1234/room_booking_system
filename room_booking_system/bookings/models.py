@@ -46,85 +46,33 @@ class Booking(models.Model):
     
     def clean(self):
         """
-        Validate booking to prevent overlapping times and apply rules.
+        Validate booking to prevent overlapping times and ensure logical booking times.
         """
         # Prevent overlapping bookings
         overlapping_bookings = Booking.objects.filter(
             room=self.room,
-            start_time__lt=self.end_time,
-            end_time__gt=self.start_time,
-        ).exclude(id=self.id)
+            start_time__lt=self.end_time,  # Overlap condition
+            end_time__gt=self.start_time   # Overlap condition
+        ).exclude(id=self.id)  # Exclude current instance during updates
+
         if overlapping_bookings.exists():
             raise ValidationError("This booking overlaps with an existing booking.")
 
-        # Validate user roles and peak usage
-        analytics = Analytics.objects.filter(room=self.room, date=self.start_time.date()).first()
-        if analytics:
-            peak_hours = analytics.peak_hours or {}
-            start_hour = self.start_time.hour
-            end_hour = self.end_time.hour
-            for hour in range(start_hour, end_hour):
-                hour_label = f"{hour}:00-{hour + 1}:00"
-                if peak_hours.get(hour_label, 0) > 5:
-                    raise ValidationError("Cannot book during peak hours.")
-            if analytics.utilization_rate > 80 and self.user.role not in ["staff", "admin"]:
-                raise ValidationError("Bookings during peak usage are restricted to staff and admins.")
-
-        # Validate start and end times
+        # Validate that start time is before end time
         if self.start_time >= self.end_time:
             raise ValidationError("Start time must be before end time.")
 
     def save(self, *args, **kwargs):
         """
-        Save the booking after validation and apply dynamic pricing.
+        Save the booking after validation.
         """
-        self.clean()
-
-        # Only calculate price for new bookings
-        if not self.pk:
-            self.price = self.calculate_dynamic_price(self.room, self.start_time)
-            print(f"Dynamic Pricing Applied: Room: {self.room.name}, Start Time: {self.start_time}, Price: {self.price}")
-
+        self.clean()  # Ensure validations are applied
         super().save(*args, **kwargs)
-
-        from analytics.signals import update_analytics_on_save  # Prevent circular import
-        update_analytics_on_save(Booking, self, created=self.pk is None)
-
-    def delete(self, *args, **kwargs):
-        """
-        Delete the booking and update analytics.
-        """
-        super().delete(*args, **kwargs)
-        from analytics.signals import update_analytics_on_delete
-        update_analytics_on_delete(Booking, self)
-
-    @staticmethod
-    def calculate_dynamic_price(room, start_time, base_price=100):
-        """
-        Adjust booking price dynamically based on room utilization.
-        """
-        analytics = Analytics.objects.filter(room=room, date=start_time.date()).first()
-        if not analytics:
-            print(f"No analytics found for room {room.name} on date {start_time.date()}. Applying base price.")
-            return base_price
-
-        print(f"Utilization Rate: {analytics.utilization_rate}")
-        if analytics.utilization_rate > 80:
-            print("High utilization rate detected. Applying 50% increase.")
-            return base_price * 1.5  # Increase price by 50%
-        elif analytics.utilization_rate < 30:
-            print("Low utilization rate detected. Applying 20% discount.")
-            return base_price * 0.8  # Offer a 20% discount
-        print("Normal utilization rate. Applying base price.")
-        return base_price
 
     def approve(self):
         """
         Approve the booking and notify the user.
         """
-        analytics = Analytics.objects.filter(room=self.room, date=self.start_time.date()).first()
-        if analytics and analytics.utilization_rate > 80 and self.user.role == 'student':
-            raise ValidationError("Students are not allowed to book during peak hours.")
         self.status = 'approved'
         self.is_approved = True
         self.save()
