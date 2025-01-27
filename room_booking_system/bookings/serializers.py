@@ -9,7 +9,8 @@ class BookingSerializer(serializers.ModelSerializer):
     room = serializers.StringRelatedField(read_only=True)  # Display room name in responses
     user_id = serializers.PrimaryKeyRelatedField(queryset=User.objects.all(), write_only=True)  # Accept user ID
     room_id = serializers.PrimaryKeyRelatedField(queryset=Room.objects.all(), write_only=True)  # Accept room ID
-
+    room_name = serializers.CharField(source='room.name', read_only=True)  # Explicitly add room name
+    
     class Meta:
         model = Booking
         fields = '__all__'
@@ -33,7 +34,7 @@ class BookingSerializer(serializers.ModelSerializer):
         room = data.get('room_id')
         start_time = data.get('start_time')
         end_time = data.get('end_time')
-
+        
         print(f"Validating booking: room={room}, start_time={start_time}, end_time={end_time}")
 
         # Check for overlapping bookings

@@ -11,6 +11,7 @@ class Booking(models.Model):
         ('approved', 'Approved'),
         ('checked_in', 'Checked In'),
         ('canceled', 'Canceled'),
+        ('checked_out', 'Checked Out'),
     )
 
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="bookings")
@@ -24,7 +25,9 @@ class Booking(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
-    
+    degree_major = models.TextField(null=True, blank=True)  # Changed to TextField
+    purpose = models.TextField(default="N/A")
+
     class Meta:
         ordering = ['start_time']
         constraints = [
@@ -110,10 +113,31 @@ class Booking(models.Model):
 
     def calculate_penalty(self):
         """
-        Calculate penalty based on the booking status and cancellation time.
+        Calculate penalty for various booking violations:
+        - Late cancellation
+        - No-show (approved but not checked in)
+        - Overstaying (checked in but not checked out after end_time)
         """
-        if self.status == 'canceled' and self.end_time < timezone.now():
-            return 50.00  # Example: Late cancellation penalty
-        if self.status == 'approved' and not self.checked_in and self.start_time < timezone.now():
-            return 100.00  # Example: No-show penalty
-        return 0.00
+        current_time = timezone.now()
+        print(f"Debug: Calculating penalty for booking {self.id}. Current time: {current_time}.")  # Debugging log
+
+        # Penalty for late cancellation
+        if self.status == 'canceled' and self.end_time < current_time:
+            print("Debug: Late cancellation penalty applied.")  # Debugging log
+            return 50.00
+
+        # Penalty for no-show
+        if self.status == 'approved' and not self.checked_in and self.start_time < current_time:
+            print("Debug: No-show penalty applied.")  # Debugging log
+            return 100.00
+
+        # Penalty for overstaying (checked in but end_time has passed)
+        if self.status == 'checked_in' and current_time > self.end_time:
+            overstay_duration = (current_time - self.end_time).total_seconds() / 60  # Overstay duration in minutes
+            penalty_rate = 2.00  # Example penalty rate per minute
+            penalty = round(overstay_duration * penalty_rate, 2)
+            print(f"Debug: Overstay penalty calculated: {penalty}.")  # Debugging log
+            return penalty
+
+        print("Debug: No penalty applicable.")  # Debugging log
+        return 0.00  # No penalty

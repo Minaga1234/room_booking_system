@@ -4,6 +4,7 @@ from django.utils import timezone  # Import timezone
 from rest_framework.decorators import action
 from .models import Room, UsageLog
 from bookings.models import Booking  # Import Booking directly
+from bookings.serializers import BookingSerializer
 from .serializers import RoomSerializer, UsageLogSerializer
 from .permissions import IsAdminOrReadOnly  # Custom permission
 
@@ -79,3 +80,19 @@ class RoomViewSet(viewsets.ModelViewSet):
         log.end_time = timezone.now()
         log.save()
         return Response({"message": "Room usage ended.", "log": UsageLogSerializer(log).data})
+    
+    @action(detail=True, methods=['get'])
+    def bookings(self, request, pk=None):
+        """
+        Fetch bookings for the specified room.
+        """
+        room = self.get_object()
+        today_start = timezone.now().replace(hour=0, minute=0, second=0, microsecond=0)
+        today_end = today_start + timezone.timedelta(days=1)
+        bookings = Booking.objects.filter(
+            room=room,
+            start_time__gte=today_start,
+            start_time__lt=today_end
+        )
+        serializer = BookingSerializer(bookings, many=True)
+        return Response(serializer.data)

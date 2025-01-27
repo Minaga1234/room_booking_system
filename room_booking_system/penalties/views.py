@@ -33,7 +33,6 @@ class PenaltyPagination(PageNumberPagination):
             'results': data,
         })
 
-
 class PenaltyViewSet(viewsets.ModelViewSet):
     queryset = Penalty.objects.all()
     serializer_class = PenaltySerializer
