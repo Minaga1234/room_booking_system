@@ -27,8 +27,9 @@ SECRET_KEY = 'django-insecure-5!@((90pe*b(+z$*6n_qf!swlxd8ih$3cy+0b6t$7!s+7kevym
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['127.0.0.1', 'localhost', 'testserver', '46.250.225.210', 'ibs.lunox.dev', 'www.ibs.lunox.dev'] # Application definition
+ALLOWED_HOSTS = ['127.0.0.1', 'localhost', 'testserver', '46.250.225.210', 'ibs.lunox.dev', 'www.ibs.lunox.dev']
 
+# Application definition
 INSTALLED_APPS = [
     # Default Django apps
     'django.contrib.admin',
@@ -58,7 +59,7 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
-    'corsheaders.middleware.CorsMiddleware',
+    'corsheaders.middleware.CorsMiddleware',  # CORS middleware must come first
     'django.middleware.common.CommonMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
@@ -67,7 +68,6 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
-
 
 ROOT_URLCONF = 'room_booking_system.urls'
 
@@ -103,7 +103,6 @@ DATABASES = {
 
 AUTH_USER_MODEL = 'users.CustomUser'
 
-
 # Password validation
 AUTH_PASSWORD_VALIDATORS = [
     {
@@ -133,12 +132,9 @@ STATICFILES_DIRS = [os.path.join(BASE_DIR, 'static')]
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
 MEDIA_URL = '/media/'
-
 MEDIA_ROOT = BASE_DIR / 'media'
 
 # Logging Configuration
-
-
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
@@ -158,7 +154,6 @@ LOGGING = {
     },
 }
 
-
 # Django REST Framework Configuration
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
@@ -167,8 +162,7 @@ REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.AllowAny',
     ],
-    'DEFAULT_FILTER_BACKENDS': ['django_filters.rest_framework.DjangoFilterBackend',
-    ]
+    'DEFAULT_FILTER_BACKENDS': ['django_filters.rest_framework.DjangoFilterBackend'],
 }
 
 # JWT Configuration
@@ -190,9 +184,8 @@ CELERY_TASK_SERIALIZER = 'json'
 # Default Primary Key Field Type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-# CORS Settings for Development
-# CORS Settings for Development
-CORS_ALLOW_ALL_ORIGINS = True  # Allow any origin
+# CORS Settings
+CORS_ALLOW_ALL_ORIGINS = True  # Allow all origins
 CORS_ALLOW_CREDENTIALS = True  # Allow cookies or other credentials
 
 # CSRF Settings
@@ -206,4 +199,3 @@ CSRF_TRUSTED_ORIGINS = [
     "https://ibs.lunox.dev",
     "https://isms.lunox.dev"
 ]
-
