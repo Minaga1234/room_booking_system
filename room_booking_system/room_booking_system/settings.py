@@ -48,10 +48,18 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
+    'DisableCSRF',  # Custom middleware to disable CSRF
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
+
+# Custom CSRF Disable Middleware
+from django.utils.deprecation import MiddlewareMixin
+
+class DisableCSRF(MiddlewareMixin):
+    def process_request(self, request):
+        setattr(request, '_dont_enforce_csrf_checks', True)
 
 # URL Configuration
 ROOT_URLCONF = 'room_booking_system.urls'
@@ -166,8 +174,3 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # CORS Configuration
 CORS_ALLOW_ALL_ORIGINS = True  # Allow all origins
 CORS_ALLOW_CREDENTIALS = True  # Allow cookies or credentials
-
-# CSRF Settings (Disabled)
-CSRF_TRUSTED_ORIGINS = []  # Removed trusted origins
-CSRF_COOKIE_SECURE = False
-SESSION_COOKIE_SECURE = False
