@@ -27,7 +27,7 @@ SECRET_KEY = 'django-insecure-5!@((90pe*b(+z$*6n_qf!swlxd8ih$3cy+0b6t$7!s+7kevym
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['127.0.0.1', 'localhost', 'testserver'] # Application definition
+ALLOWED_HOSTS = ['127.0.0.1', 'localhost', 'testserver', '46.250.225.210', 'ibs.lunox.dev', 'www.ibs.lunox.dev'] # Application definition
 
 INSTALLED_APPS = [
     # Default Django apps
@@ -93,9 +93,9 @@ WSGI_APPLICATION = 'room_booking_system.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.mysql',
-        'NAME': 'room_booking_system',
-        'USER': 'root',
-        'PASSWORD': 'Cponline@99',
+        'NAME': 'room_booking',
+        'USER': 'room_user',
+        'PASSWORD': '123456',
         'HOST': '127.0.0.1',
         'PORT': '3306',
     }
@@ -137,19 +137,27 @@ MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
 # Logging Configuration
+
+
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
     'handlers': {
-        'console': {
-            'class': 'logging.StreamHandler',
+        'file': {
+            'level': 'DEBUG',
+            'class': 'logging.FileHandler',
+            'filename': '/var/www/room_booking_system/room_booking_system/django_debug.log',
         },
     },
-    'root': {
-        'handlers': ['console'],
-        'level': 'DEBUG',
+    'loggers': {
+        'django': {
+            'handlers': ['file'],
+            'level': 'DEBUG',
+            'propagate': True,
+        },
     },
 }
+
 
 # Django REST Framework Configuration
 REST_FRAMEWORK = {
