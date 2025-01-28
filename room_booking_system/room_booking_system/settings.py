@@ -195,6 +195,8 @@ CORS_ALLOWED_ORIGINS = [
     "http://127.0.0.1:5500",
     "http://localhost:5500",
     "http://127.0.0.1:5501",
+    "https://ibs.lunox.dev",
+    "https://isms.lunox.dev"
 ]
 
 CSRF_COOKIE_SECURE = False  # Disable for development
@@ -205,7 +207,7 @@ CSRF_TRUSTED_ORIGINS = [
     "http://localhost:5500",
     "http://127.0.0.1:5501",
     "https://ibs.lunox.dev",
-    "https://isms.lunox.dev/"
+    "https://isms.lunox.dev"
 ]
 
 CORS_ALLOW_CREDENTIALS = True  # Allow cookies or other credentials
