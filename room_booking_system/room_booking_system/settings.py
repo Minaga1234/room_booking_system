@@ -191,14 +191,11 @@ CELERY_TASK_SERIALIZER = 'json'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # CORS Settings for Development
-CORS_ALLOWED_ORIGINS = [
-    "http://127.0.0.1:5500",
-    "http://localhost:5500",
-    "http://127.0.0.1:5501",
-    "https://ibs.lunox.dev",
-    "https://isms.lunox.dev"
-]
+# CORS Settings for Development
+CORS_ALLOW_ALL_ORIGINS = True  # Allow any origin
+CORS_ALLOW_CREDENTIALS = True  # Allow cookies or other credentials
 
+# CSRF Settings
 CSRF_COOKIE_SECURE = False  # Disable for development
 SESSION_COOKIE_SECURE = False  # Disable for development
 
@@ -210,7 +207,3 @@ CSRF_TRUSTED_ORIGINS = [
     "https://isms.lunox.dev"
 ]
 
-CORS_ALLOW_CREDENTIALS = True  # Allow cookies or other credentials
-
-# Remove CORS_ALLOW_ALL_ORIGINS to ensure strict control
-# CSRF_COOKIE_SECURE is False for development but must be True in production with HTTPS
