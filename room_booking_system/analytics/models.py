@@ -6,7 +6,7 @@ class Analytics(models.Model):
     date = models.DateField()
     total_bookings = models.IntegerField(default=0)
     total_checkins = models.IntegerField(default=0)
-    total_cancellations = models.IntegerField(default=0)  # Ensure this field exists
+    total_cancellations = models.IntegerField(default=0)
     total_usage_time = models.FloatField(default=0.0)
     peak_hours = models.JSONField(default=dict)
     utilization_rate = models.FloatField(default=0.0)

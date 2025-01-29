@@ -10,7 +10,6 @@ from django.utils.timezone import make_aware
 import pytz
 import logging
 import re
-import re
 
 # Logger setup
 logger = logging.getLogger(__name__)

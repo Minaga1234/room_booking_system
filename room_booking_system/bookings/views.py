@@ -273,8 +273,6 @@ class BookingViewSet(viewsets.ModelViewSet):
             return Response({"error": f"Error during check-out: {str(e)}"}, status=500)
 
 
-
-
     def apply_penalty(self, booking, reason="Late cancellation or no-show"):
         """
         Apply penalty to the user for specific reasons.
