@@ -12,34 +12,33 @@ class NotificationViewSet(viewsets.ModelViewSet):
     """
     queryset = Notification.objects.all()
     serializer_class = NotificationSerializer
-    permission_classes = [AllowAny]
+    permission_classes = [AllowAny]  # Allows both authenticated and anonymous users
 
     def get_queryset(self):
         """
-        Filter notifications for the logged-in user.
+        Allow anonymous users to access general notifications.
+        Authenticated users see their specific notifications.
         """
         user = self.request.user
-        print(f"Authenticated user: {user}")  # Debug log
-        return Notification.objects.filter(user=user)
-
-
-    @action(detail=False, methods=['get'])
-    def my_notifications(self, request):
-        """
-        Retrieve notifications for the logged-in user.
-        Optional query parameter `unread` to filter unread notifications.
-        """
-        user = self.request.user
-        if not user.is_authenticated:  # Ensure the user is authenticated
-            raise NotAuthenticated("User must be authenticated to view notifications.")
+        print(f"Authenticated user: {user} | Authenticated? {user.is_authenticated}")  # Debugging
         
-        unread_only = request.query_params.get('unread', 'false').lower() == 'true'
-        notifications = self.get_queryset()
-        if unread_only:
-            notifications = notifications.filter(is_read=False)
-        serializer = self.get_serializer(notifications, many=True)
-        return Response(serializer.data)
+        if user.is_authenticated:
+            return Notification.objects.filter(user=user)  # Return user-specific notifications
+        else:
+            return Notification.objects.all()  # Allow anonymous users to see all notifications
 
+    def list(self, request, *args, **kwargs):
+        """
+        Override default list() to return JSON object instead of array.
+        """
+        queryset = self.get_queryset()
+        serializer = self.get_serializer(queryset, many=True)
+        
+        response_data = {"notifications": serializer.data}  # Wrap response inside a dictionary
+
+        print("📌 Returning Notifications:", response_data)  # Debugging log
+
+        return Response(response_data)
 
     @action(detail=True, methods=['post'])
     def mark_as_read(self, request, pk=None):

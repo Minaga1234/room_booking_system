@@ -27,7 +27,7 @@ urlpatterns = [
     path('api/rooms/', include('rooms.urls')),
     path('api/bookings/', include('bookings.urls')),
     path('penalties/', include('penalties.urls')),
-    path('notifications/', include('notifications.urls', namespace='notifications')),
+    path('api/notifications/', include('notifications.urls', namespace='notifications')),  # FIXED
     path('chatbot/', include('chatbot.urls')),
     path('analytics/', include('analytics.urls')),
     path('feedback/', include('feedback.urls')),
